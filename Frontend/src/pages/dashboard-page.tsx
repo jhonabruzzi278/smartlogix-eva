@@ -235,7 +235,7 @@ export function DashboardPage() {
         </div>
 
         {/* Recent orders (second on mobile, first on desktop) */}
-        <div className="rounded border border-border bg-white order-last lg:order-first">
+        <div className="rounded border border-border bg-white order-last lg:order-first max-w-sm w-full mx-auto sm:max-w-none">
           <div className="flex items-center justify-between border-b border-[#ECEEF0] px-4 py-3">
             <h2 className="text-sm font-bold text-foreground">Pedidos recientes</h2>
             <Link to="/orders" className="flex items-center gap-1 text-xs font-semibold text-[#4B98CF] hover:text-[#346384]">
@@ -308,7 +308,7 @@ export function DashboardPage() {
       </div>
 
       {/* Shipments active */}
-      <div className="rounded border border-border bg-white">
+      <div className="rounded border border-border bg-white max-w-sm w-full mx-auto sm:max-w-none">
         <div className="flex items-center justify-between border-b border-[#ECEEF0] px-4 py-3">
           <h2 className="text-sm font-bold text-foreground">Envios en curso</h2>
           <Link to="/shipments" className="flex items-center gap-1 text-xs font-semibold text-[#4B98CF] hover:text-[#346384]">

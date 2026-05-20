@@ -138,7 +138,7 @@ export function OrdersPage() {
     stage === "delivered" ? "bg-green-50 text-green-600" : "bg-muted text-muted-foreground";
 
   return (
-    <div className="space-y-4 max-w-md mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
+    <div className="space-y-4 max-w-sm w-full mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[1.2px] text-muted-foreground">Pedidos</p>
