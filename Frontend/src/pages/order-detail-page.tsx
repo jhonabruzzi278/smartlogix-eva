@@ -159,12 +159,14 @@ export function OrderDetailPage() {
 
             <div className="rounded bg-[#F8FAFB] px-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#939FAD] mb-2">Items</p>
-              {order.items?.map((item, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 border-b border-[#ECEEF0] last:border-0">
-                  <span className="text-sm text-[#112b4a]">{item.name}</span>
-                  <span className="text-xs text-[#939FAD]">SKU {item.sku} x{item.quantity}</span>
-                </div>
-              )) ?? (
+              {Array.isArray(order.items) && order.items.length > 0 ? (
+                order.items.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between py-1.5 border-b border-[#ECEEF0] last:border-0">
+                    <span className="text-sm text-[#112b4a]">{item.name}</span>
+                    <span className="text-xs text-[#939FAD]">SKU {item.sku} x{item.quantity}</span>
+                  </div>
+                ))
+              ) : (
                 <div className="flex items-center justify-between py-1.5">
                   <span className="text-sm text-[#112b4a]">Producto {order.sku}</span>
                   <span className="text-xs text-[#939FAD]">x{order.quantity}</span>
@@ -172,10 +174,10 @@ export function OrderDetailPage() {
               )}
             </div>
 
-            {(order as Record<string, unknown>).operationalNote && (
+            {(order as import("@/hooks/use-operational-workspace").OperationalOrder).operationalNote && (
               <div className="rounded border border-[#4B98CF]/20 bg-[#4B98CF]/5 px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#4B98CF]">Nota operativa</p>
-                <p className="mt-1 text-sm text-[#112b4a]">{String((order as Record<string, unknown>).operationalNote)}</p>
+                <p className="mt-1 text-sm text-[#112b4a]">{String((order as import("@/hooks/use-operational-workspace").OperationalOrder).operationalNote)}</p>
               </div>
             )}
           </div>
