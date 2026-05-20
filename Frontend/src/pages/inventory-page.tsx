@@ -47,7 +47,7 @@ export function InventoryPage() {
   if (!inventory) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-md mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#939FAD]">Inventario</p>

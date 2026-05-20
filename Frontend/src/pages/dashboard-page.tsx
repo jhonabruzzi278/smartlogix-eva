@@ -90,7 +90,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 max-w-md mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
       {/* Botón instalar PWA */}
       {canInstall && (
         <div className="flex justify-center">
