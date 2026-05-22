@@ -35,7 +35,7 @@ public class Order {
 
     @NotNull(message = "El SKU del producto no puede ser nulo")
     @Column(nullable = false)
-    private Long sku;
+    private String sku;
 
     @NotNull(message = "La cantidad es obligatoria")
     @Min(value = 1, message = "La cantidad minima debe ser 1")
@@ -48,4 +48,7 @@ public class Order {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "assigned_to", length = 100)
+    private String assignedTo;
 }

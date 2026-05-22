@@ -3,6 +3,7 @@ import { RequireAuth } from "@/app/auth";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccessDeniedPage } from "@/pages/access-denied-page";
 import { CalendarPage } from "@/pages/calendar-page";
+import { CustomersPage } from "@/pages/customers-page";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { InventoryDetailPage } from "@/pages/inventory-detail-page";
 import { InventoryPage } from "@/pages/inventory-page";
@@ -10,9 +11,12 @@ import { LoginPage } from "@/pages/login-page";
 import { NotificationsPage } from "@/pages/notifications-page";
 import { OrderDetailPage } from "@/pages/order-detail-page";
 import { OrdersPage } from "@/pages/orders-page";
+import { PosPage } from "@/pages/pos-page";
 import { ProfilePage } from "@/pages/profile-page";
 import { ReportsPage } from "@/pages/reports-page";
 import { ShipmentsPage } from "@/pages/shipments-page";
+import { ShipperDeliveryPage } from "@/pages/shipper-delivery-page";
+import { ShipmentDetailPage } from "@/pages/shipment-detail-page";
 import { UsersPage } from "@/pages/users-page";
 
 export const router = createBrowserRouter([
@@ -33,9 +37,14 @@ export const router = createBrowserRouter([
           { path: "/dashboard", element: <DashboardPage /> },
           { path: "/inventory", element: <InventoryPage /> },
           { path: "/inventory/:productId", element: <InventoryDetailPage /> },
+          { path: "/pos", element: <PosPage /> },
           { path: "/orders", element: <OrdersPage /> },
           { path: "/orders/:orderId", element: <OrderDetailPage /> },
+          { path: "/customers", element: <CustomersPage /> },
           { path: "/shipments", element: <ShipmentsPage /> },
+          { path: "/shipments/:shipmentId", element: <ShipmentDetailPage /> },
+          { path: "/deliveries", element: <ShipperDeliveryPage /> },
+          { path: "/deliveries/:shipmentId", element: <ShipmentDetailPage /> },
           { path: "/alerts", element: <Navigate to="/notifications" replace /> },
           { path: "/calendar", element: <CalendarPage /> },
           { path: "/reports", element: <ReportsPage /> },

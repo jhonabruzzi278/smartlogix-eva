@@ -17,7 +17,7 @@ public class OrderRequest {
     private Long customerId;
 
     @NotNull(message = "El SKU del producto es obligatorio")
-    private Long sku;
+    private String sku;
 
     @NotNull(message = "La cantidad es obligatoria")
     @Min(value = 1, message = "La cantidad minima debe ser 1")

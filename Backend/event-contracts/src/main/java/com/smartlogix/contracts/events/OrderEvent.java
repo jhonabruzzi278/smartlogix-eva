@@ -23,7 +23,7 @@ public class OrderEvent {
     private Long customerId;
 
     @NotNull(message = "sku es requerido")
-    private Long sku;
+    private String sku;
 
     @NotNull(message = "quantity es requerido")
     @Min(value = 1, message = "quantity debe ser >= 1")

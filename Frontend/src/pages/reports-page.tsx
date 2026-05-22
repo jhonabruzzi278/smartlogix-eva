@@ -1,16 +1,16 @@
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Clock, Download, Package, Search, ShoppingBag, Table2, Truck } from "lucide-react";
-import { orders as fallbackOrders, products as fallbackProducts, shipments as fallbackShipments } from "@/data/mock-data";
+﻿import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Clock, Download, Package, Search, ShoppingBag, ShoppingCart, Table2, Truck } from "lucide-react";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { adaptInventory, adaptOrder, adaptShipment } from "@/lib/api-adapters";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import { exportInventoryCSV, exportOrdersCSV, exportSalesCSV, exportShipmentsCSV } from "@/lib/export-csv";
 import type { ApiInventory, ApiOrder, ApiShipment } from "@/types/api";
-import type { Order, Product, Shipment } from "@/types/domain";
+import type { Order, Product, Sale, Shipment } from "@/types/domain";
 
 type Period = "7d" | "30d" | "90d" | "all";
 type ViewMode = "charts" | "table";
-type ActiveTab = "orders" | "shipments" | "stock";
+type ActiveTab = "orders" | "shipments" | "stock" | "sales";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "7d", label: "7 dias" },
@@ -23,6 +23,7 @@ const TABS: { value: ActiveTab; label: string; icon: typeof BarChart3 }[] = [
   { value: "orders", label: "Pedidos", icon: ShoppingBag },
   { value: "shipments", label: "Envios", icon: Truck },
   { value: "stock", label: "Stock", icon: Boxes },
+  { value: "sales", label: "Ventas", icon: ShoppingCart },
 ];
 
 const BAR_COLORS = ["#4B98CF", "#4EB4A5", "#E3AA75", "#5163C5", "#CF4B4B", "#16BA71", "#E3AA75"];
@@ -54,7 +55,7 @@ function InteractiveBarChart({
 
   return (
     <div>
-      <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">{title}</p>
+      <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">{title}</p>
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${Math.max(totalW, 200)} ${height}`}
@@ -68,7 +69,7 @@ function InteractiveBarChart({
               <g key={pct}>
                 <line x1={0} y1={y} x2={totalW} y2={y} stroke="#ECEEF0" strokeDasharray={pct === 0 ? "" : "3 3"} />
                 {pct > 0 && (
-                  <text x={4} y={y - 4} className="text-[8px]" fill="#939FAD">
+                  <text x={4} y={y - 4} className="text-[8px]" fill="#6B7280">
                     {Math.round(max * pct)}
                   </text>
                 )}
@@ -108,7 +109,7 @@ function InteractiveBarChart({
                 <text x={x + barW / 2} y={y - 8} textAnchor="middle" className={cn("text-[11px] font-bold transition-opacity", isHovered ? "opacity-100" : "opacity-0")} fill="#112b4a">
                   {d.value}
                 </text>
-                <text x={x + barW / 2} y={height - 14} textAnchor="middle" className="text-[9px]" fill="#939FAD">
+                <text x={x + barW / 2} y={height - 14} textAnchor="middle" className="text-[9px]" fill="#6B7280">
                   {d.label.length > 5 ? d.label.slice(0, 5) : d.label}
                 </text>
               </g>
@@ -124,7 +125,7 @@ function InteractiveBarChart({
         >
           <p className="text-xs font-bold text-[#112b4a]">{tooltip.label}</p>
           <p className="text-lg font-bold text-[#4B98CF]">{tooltip.value}</p>
-          {tooltip.detail && <p className="text-[10px] text-[#939FAD]">{tooltip.detail}</p>}
+          {tooltip.detail && <p className="text-[10px] text-[#6B7280]">{tooltip.detail}</p>}
         </div>
       )}
     </div>
@@ -145,7 +146,7 @@ function ProgressBar({ label, value, max, color, detail }: { label: string; valu
         <span className="text-xs font-medium text-[#112b4a]">{label}</span>
         <span className={cn("text-xs font-bold transition-all", hovered ? "text-base" : "text-[#112b4a]")} style={{ color: hovered ? color : undefined }}>
           {value}
-          {detail && hovered && <span className="ml-1 text-[10px] font-normal text-[#939FAD]">{detail}</span>}
+          {detail && hovered && <span className="ml-1 text-[10px] font-normal text-[#6B7280]">{detail}</span>}
         </span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-[#F5F7F9]">
@@ -166,16 +167,16 @@ export function ReportsPage() {
   const [selectedBar, setSelectedBar] = useState<{ label: string; value: number } | null>(null);
 
   const { data: orders } = useApiQuery<ApiOrder[], Order[]>({
-    path: "/api/orders", fallbackData: fallbackOrders, transform: (r) => r.map(adaptOrder)
+    path: "/api/orders", transform: (r) => r.map(adaptOrder)
   });
   const { data: inventory } = useApiQuery<ApiInventory[], Product[]>({
-    path: "/api/inventory", fallbackData: fallbackProducts, transform: (r) => r.map(adaptInventory)
+    path: "/api/inventory", transform: (r) => r.map(adaptInventory)
   });
   const { data: shipments } = useApiQuery<ApiShipment[], Shipment[]>({
-    path: "/api/shipments", fallbackData: fallbackShipments, transform: (r) => r.map(adaptShipment)
+    path: "/api/shipments", transform: (r) => r.map(adaptShipment)
   });
 
-  const { operationalInventory } = useOperationalWorkspace({ orders, inventory, shipments });
+  const { operationalInventory, getAllSales } = useOperationalWorkspace({ orders, inventory, shipments });
 
   const now = new Date();
   const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : period === "90d" ? 90 : 365;
@@ -272,12 +273,72 @@ export function ReportsPage() {
     };
   }, [filteredOrders, filteredShipments, inventory, operationalInventory]);
 
+  const [allSales, setAllSales] = useState<Sale[]>([]);
+
+  useEffect(() => {
+    getAllSales().then(setAllSales).catch(() => setAllSales([]));
+  }, [getAllSales]);
+
+  const salesReport = useMemo(() => {
+    let sales = allSales ?? [];
+    if (period !== "all") {
+      const cutoff = new Date(now.getTime() - periodDays * 86400000);
+      sales = sales.filter((s) => new Date(s.createdAt) >= cutoff);
+    }
+    if (filterQuery) {
+      const q = filterQuery.toLowerCase();
+      sales = sales.filter((s) => s.id.toLowerCase().includes(q) || s.vendorName.toLowerCase().includes(q) || s.paymentMethod.toLowerCase().includes(q));
+    }
+
+    const dayNames = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+    const dayRevMap = new Map<string, number>();
+    sales.forEach((s) => {
+      const day = dayNames[new Date(s.createdAt).getDay()] ?? "Dom";
+      dayRevMap.set(day, (dayRevMap.get(day) ?? 0) + s.total);
+    });
+    const revenueByDay = dayNames.map((day) => ({
+      label: day,
+      value: Math.round(dayRevMap.get(day) ?? 0),
+      color: "#4B98CF",
+    }));
+
+    const vendorMap = new Map<string, number>();
+    const vendorCountMap = new Map<string, number>();
+    sales.forEach((s) => {
+      vendorMap.set(s.vendorName, (vendorMap.get(s.vendorName) ?? 0) + s.total);
+      vendorCountMap.set(s.vendorName, (vendorCountMap.get(s.vendorName) ?? 0) + 1);
+    });
+    const revenueByVendor = Array.from(vendorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([vendor, total], i) => ({
+        label: vendor,
+        value: Math.round(total),
+        color: BAR_COLORS[i % BAR_COLORS.length],
+        detail: `${vendorCountMap.get(vendor) ?? 0} ventas`,
+      }));
+
+    const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
+    const totalSalesCount = sales.length;
+    const avgTicket = totalSalesCount > 0 ? Math.round(totalRevenue / totalSalesCount) : 0;
+    const topVendorEntry = Array.from(vendorMap.entries()).sort((a, b) => b[1] - a[1])[0] ?? null;
+
+    return {
+      revenueByDay,
+      revenueByVendor,
+      totalRevenue,
+      totalSalesCount,
+      avgTicket,
+      topVendor: topVendorEntry ? { name: topVendorEntry[0], value: Math.round(topVendorEntry[1]) } : null,
+      filteredSales: sales,
+    };
+  }, [allSales, period, periodDays, filterQuery, now]);
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#939FAD]">Reportes</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Reportes</p>
           <h1 className="text-xl font-bold text-[#112b4a]">Analytics operacional</h1>
         </div>
 
@@ -290,7 +351,7 @@ export function ReportsPage() {
                 onClick={() => { setPeriod(p.value); setSelectedBar(null); }}
                 className={cn(
                   "rounded px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                  period === p.value ? "bg-[#4B98CF] text-white" : "text-[#939FAD] hover:text-[#112b4a]"
+                  period === p.value ? "bg-[#4B98CF] text-white" : "text-[#6B7280] hover:text-[#112b4a]"
                 )}
               >
                 {p.label}
@@ -301,14 +362,27 @@ export function ReportsPage() {
           {/* View toggle */}
           <div className="flex rounded border border-[#DCE0E2] bg-white p-0.5">
             <button onClick={() => setViewMode("charts")} className={cn("rounded p-1.5", viewMode === "charts" && "bg-[#F5F7F9]")}>
-              <BarChart3 className={cn("h-4 w-4", viewMode === "charts" ? "text-[#4B98CF]" : "text-[#939FAD]")} />
+              <BarChart3 className={cn("h-4 w-4", viewMode === "charts" ? "text-[#4B98CF]" : "text-[#6B7280]")} />
             </button>
             <button onClick={() => setViewMode("table")} className={cn("rounded p-1.5", viewMode === "table" && "bg-[#F5F7F9]")}>
-              <Table2 className={cn("h-4 w-4", viewMode === "table" ? "text-[#4B98CF]" : "text-[#939FAD]")} />
+              <Table2 className={cn("h-4 w-4", viewMode === "table" ? "text-[#4B98CF]" : "text-[#6B7280]")} />
             </button>
           </div>
 
-          <button className="flex items-center gap-1.5 rounded border border-[#DCE0E2] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#939FAD] hover:bg-[#F5F7F9] hover:text-[#112b4a]">
+          <button
+            onClick={() => {
+              if (activeTab === "sales") {
+                exportSalesCSV(salesReport.filteredSales.map((s) => ({ id: s.id, items: s.items.map((i) => `${i.quantity}x ${i.name}`).join("; "), vendorName: s.vendorName, total: s.total, paymentMethod: s.paymentMethod, createdAt: s.createdAt })));
+              } else if (activeTab === "orders") {
+                exportOrdersCSV(filteredOrders.map((o) => ({ id: o.id, customer: o.customer, sku: o.sku, quantity: o.quantity, stage: o.stage.replace(/_/g, " "), createdAt: o.createdAt })));
+              } else if (activeTab === "shipments") {
+                exportShipmentsCSV(filteredShipments.map((s) => ({ id: s.id, tracking: s.tracking, orderId: s.orderId, sku: s.sku, stage: s.stage.replace(/_/g, " "), carrier: s.carrier, createdAt: s.createdAt ?? "" })));
+              } else {
+                exportInventoryCSV((inventory ?? []).map((p) => ({ sku: p.sku, stock: p.stock, status: p.status, updatedAt: p.updatedAt })));
+              }
+            }}
+            className="flex items-center gap-1.5 rounded border border-[#DCE0E2] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#6B7280] hover:bg-[#F5F7F9] hover:text-[#112b4a]"
+          >
             <Download className="h-3.5 w-3.5" />
             Exportar
           </button>
@@ -317,18 +391,26 @@ export function ReportsPage() {
 
       {/* KPIs */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Pedidos totales", value: reportData.totalOrders, icon: ShoppingBag, color: "#4B98CF", trend: "+12%", trendUp: true },
-          { label: "Tasa de entrega", value: `${reportData.deliveryRate}%`, icon: Truck, color: "#4EB4A5", trend: "+5%", trendUp: true },
-          { label: "Stock bajo", value: `${reportData.lowStock}/${reportData.totalProducts}`, icon: Package, color: "#E3AA75", trend: "Critico", trendUp: false },
-          { label: "Envios activos", value: reportData.totalShipments, icon: Clock, color: "#5163C5", trend: "En curso", trendUp: true },
-        ].map((kpi) => (
+        {(activeTab === "sales"
+          ? [
+              { label: "Ingresos totales", value: formatCurrency(salesReport.totalRevenue), icon: ShoppingCart, color: "#4B98CF", trend: `${salesReport.totalSalesCount} transacciones`, trendUp: true },
+              { label: "Ticket promedio", value: formatCurrency(salesReport.avgTicket), icon: ShoppingBag, color: "#4EB4A5", trend: "por venta", trendUp: true },
+              { label: "Transacciones", value: String(salesReport.totalSalesCount), icon: BarChart3, color: "#5163C5", trend: "en el periodo", trendUp: true },
+              { label: "Top vendedor", value: salesReport.topVendor?.name ?? "N/A", icon: Package, color: "#E3AA75", trend: salesReport.topVendor ? formatCurrency(salesReport.topVendor.value) : "", trendUp: true },
+            ]
+          : [
+              { label: "Pedidos totales", value: reportData.totalOrders, icon: ShoppingBag, color: "#4B98CF", trend: "+12%", trendUp: true },
+              { label: "Tasa de entrega", value: `${reportData.deliveryRate}%`, icon: Truck, color: "#4EB4A5", trend: "+5%", trendUp: true },
+              { label: "Stock bajo", value: `${reportData.lowStock}/${reportData.totalProducts}`, icon: Package, color: "#E3AA75", trend: "Critico", trendUp: false },
+              { label: "Envios activos", value: reportData.totalShipments, icon: Clock, color: "#5163C5", trend: "En curso", trendUp: true },
+            ]
+        ).map((kpi) => (
           <div key={kpi.label} className="group rounded border border-[#DCE0E2] bg-white p-4 transition hover:border-[#4B98CF] hover:shadow-sm">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: `${kpi.color}15` }}>
                 <kpi.icon className="h-4 w-4" style={{ color: kpi.color }} />
               </div>
-              <p className="text-xs font-medium text-[#939FAD]">{kpi.label}</p>
+              <p className="text-xs font-medium text-[#6B7280]">{kpi.label}</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-[#112b4a]">{kpi.value}</p>
             <p className={cn("mt-1 flex items-center gap-1 text-[10px]", kpi.trendUp ? "text-green-600" : "text-red-500")}>
@@ -342,7 +424,7 @@ export function ReportsPage() {
       {/* Active filter badge */}
       {selectedBar && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#939FAD]">Filtrado por:</span>
+          <span className="text-xs text-[#6B7280]">Filtrado por:</span>
           <span className="inline-flex items-center gap-1 rounded-full bg-[#4B98CF]/10 px-3 py-1 text-xs font-bold text-[#4B98CF]">
             {selectedBar.label} ({selectedBar.value})
             <button onClick={() => setSelectedBar(null)} className="ml-1 hover:text-[#346384]">&times;</button>
@@ -358,7 +440,7 @@ export function ReportsPage() {
             onClick={() => { setActiveTab(tab.value); setSelectedBar(null); }}
             className={cn(
               "flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold transition-colors",
-              activeTab === tab.value ? "bg-[#4B98CF] text-white" : "text-[#939FAD] hover:text-[#112b4a]"
+              activeTab === tab.value ? "bg-[#4B98CF] text-white" : "text-[#6B7280] hover:text-[#112b4a]"
             )}
           >
             <tab.icon className="h-3.5 w-3.5" />
@@ -377,7 +459,7 @@ export function ReportsPage() {
                   <InteractiveBarChart data={reportData.ordersByDay} title="Pedidos por dia de la semana" onBarClick={(item) => setSelectedBar(item)} />
                 </div>
                 <div className="rounded border border-[#DCE0E2] bg-white p-5">
-                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Pedidos por estado</p>
+                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Pedidos por estado</p>
                   <div className="space-y-3">
                     {reportData.ordersByStage.map((s) => (
                       <div key={s.label} onClick={() => setSelectedBar({ label: s.label, value: s.value })} className="cursor-pointer">
@@ -385,7 +467,7 @@ export function ReportsPage() {
                       </div>
                     ))}
                     {reportData.ordersByStage.length === 0 && (
-                      <p className="py-8 text-center text-xs text-[#939FAD]">Sin datos para el periodo seleccionado</p>
+                      <p className="py-8 text-center text-xs text-[#6B7280]">Sin datos para el periodo seleccionado</p>
                     )}
                   </div>
                 </div>
@@ -395,7 +477,7 @@ export function ReportsPage() {
             {activeTab === "shipments" && (
               <>
                 <div className="rounded border border-[#DCE0E2] bg-white p-5">
-                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Envios por estado</p>
+                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Envios por estado</p>
                   <div className="space-y-3">
                     {reportData.shipmentsByStage.map((s) => (
                       <div key={s.label} onClick={() => setSelectedBar({ label: s.label, value: s.value })} className="cursor-pointer">
@@ -403,28 +485,28 @@ export function ReportsPage() {
                       </div>
                     ))}
                     {reportData.shipmentsByStage.length === 0 && (
-                      <p className="py-8 text-center text-xs text-[#939FAD]">Sin datos para el periodo seleccionado</p>
+                      <p className="py-8 text-center text-xs text-[#6B7280]">Sin datos para el periodo seleccionado</p>
                     )}
                   </div>
                 </div>
                 <div className="rounded border border-[#DCE0E2] bg-white p-5">
-                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Resumen de envios</p>
+                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Resumen de envios</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="rounded bg-[#F5F7F9] p-4 text-center">
                       <p className="text-2xl font-bold text-[#4EB4A5]">{filteredShipments.filter((s) => s.stage === "delivered").length}</p>
-                      <p className="text-[10px] font-medium text-[#939FAD]">Entregados</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">Entregados</p>
                     </div>
                     <div className="rounded bg-[#F5F7F9] p-4 text-center">
                       <p className="text-2xl font-bold text-[#CF4B4B]">{filteredShipments.filter((s) => s.stage === "delayed").length}</p>
-                      <p className="text-[10px] font-medium text-[#939FAD]">Retrasados</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">Retrasados</p>
                     </div>
                     <div className="rounded bg-[#F5F7F9] p-4 text-center">
                       <p className="text-2xl font-bold text-[#4B98CF]">{filteredShipments.filter((s) => s.stage.includes("out")).length}</p>
-                      <p className="text-[10px] font-medium text-[#939FAD]">En reparto</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">En reparto</p>
                     </div>
                     <div className="rounded bg-[#F5F7F9] p-4 text-center">
                       <p className="text-2xl font-bold text-[#E3AA75]">{filteredShipments.filter((s) => s.stage === "label_created" || s.stage === "picked_up").length}</p>
-                      <p className="text-[10px] font-medium text-[#939FAD]">En preparacion</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">En preparacion</p>
                     </div>
                   </div>
                 </div>
@@ -436,28 +518,74 @@ export function ReportsPage() {
                 <InteractiveBarChart data={reportData.stockBars} title="Stock por SKU" height={200} />
               </div>
             )}
+
+            {activeTab === "sales" && (
+              <>
+                <div className="rounded border border-[#DCE0E2] bg-white p-5">
+                  <InteractiveBarChart data={salesReport.revenueByDay} title="Ventas por dia de la semana" />
+                </div>
+                <div className="rounded border border-[#DCE0E2] bg-white p-5">
+                  <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Ventas por vendedor</p>
+                  <div className="space-y-3">
+                    {salesReport.revenueByVendor.length > 0
+                      ? salesReport.revenueByVendor.map((v) => (
+                          <ProgressBar key={v.label} label={v.label} value={v.value} max={salesReport.totalRevenue} color={v.color} detail={v.detail} />
+                        ))
+                      : <p className="py-8 text-center text-xs text-[#6B7280]">Sin datos para el periodo seleccionado</p>}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </>
       ) : (
         /* Table view */
         <div className="overflow-hidden rounded border border-[#DCE0E2] bg-white">
           <div className="flex items-center gap-2 border-b border-[#ECEEF0] px-4 py-3">
-            <Search className="h-4 w-4 text-[#939FAD]" />
+            <Search className="h-4 w-4 text-[#6B7280]" />
             <input
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
               placeholder="Filtrar resultados..."
-              className="flex-1 bg-transparent text-sm text-[#112b4a] outline-none placeholder:text-[#939FAD]"
+              className="flex-1 bg-transparent text-sm text-[#112b4a] outline-none placeholder:text-[#6B7280]"
             />
-            <span className="text-xs text-[#939FAD]">
-              {activeTab === "orders" ? filteredOrders.length : activeTab === "shipments" ? filteredShipments.length : inventory?.length ?? 0} resultados
+            <span className="text-xs text-[#6B7280]">
+              {activeTab === "sales" ? salesReport.filteredSales.length : activeTab === "orders" ? filteredOrders.length : activeTab === "shipments" ? filteredShipments.length : inventory?.length ?? 0} resultados
             </span>
           </div>
           <div className="overflow-x-auto">
-            {activeTab === "orders" ? (
+            {activeTab === "sales" ? (
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">
+                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
+                    <th className="px-4 py-2.5">#</th>
+                    <th className="px-4 py-2.5">Items</th>
+                    <th className="px-4 py-2.5 hidden sm:table-cell">Vendedor</th>
+                    <th className="px-4 py-2.5">Total</th>
+                    <th className="px-4 py-2.5 hidden sm:table-cell">Pago</th>
+                    <th className="px-4 py-2.5 hidden sm:table-cell">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesReport.filteredSales.map((s) => (
+                    <tr key={s.id} className="border-b border-[#F5F7F9] hover:bg-[#F5F7F9]">
+                      <td className="px-4 py-2.5 font-bold text-[#4B98CF]">{s.id}</td>
+                      <td className="max-w-[160px] truncate px-4 py-2.5 text-xs text-[#6B7280]">{s.items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}</td>
+                      <td className="hidden px-4 py-2.5 sm:table-cell">{s.vendorName}</td>
+                      <td className="px-4 py-2.5 font-bold">{formatCurrency(s.total)}</td>
+                      <td className="hidden px-4 py-2.5 sm:table-cell">
+                        <span className="rounded bg-[#F5F7F9] px-2 py-0.5 text-[10px] font-bold">{s.paymentMethod === "cash" ? "Efectivo" : s.paymentMethod === "transfer" ? "Transferencia" : s.paymentMethod}</span>
+                      </td>
+                      <td className="hidden px-4 py-2.5 text-xs text-[#6B7280] sm:table-cell">{new Date(s.createdAt).toLocaleDateString("es-CL")}</td>
+                    </tr>
+                  ))}
+                  {salesReport.filteredSales.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-xs text-[#6B7280]">Sin ventas para el periodo seleccionado</td></tr>}
+                </tbody>
+              </table>
+            ) : activeTab === "orders" ? (
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
                     <th className="px-4 py-2.5">#</th>
                     <th className="px-4 py-2.5">Cliente</th>
                     <th className="px-4 py-2.5">SKU</th>
@@ -471,12 +599,12 @@ export function ReportsPage() {
                     <tr key={o.id} className="border-b border-[#F5F7F9] hover:bg-[#F5F7F9]">
                       <td className="px-4 py-2.5 font-bold text-[#4B98CF]">{o.id}</td>
                       <td className="px-4 py-2.5">{o.customer}</td>
-                      <td className="px-4 py-2.5 text-[#939FAD]">{o.sku}</td>
+                      <td className="px-4 py-2.5 text-[#6B7280]">{o.sku}</td>
                       <td className="px-4 py-2.5 hidden sm:table-cell">{o.quantity}</td>
                       <td className="px-4 py-2.5">
                         <span className="rounded px-2 py-0.5 text-[10px] font-bold bg-[#F5F7F9]">{o.stage}</span>
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-[#939FAD] hidden sm:table-cell">{new Date(o.createdAt).toLocaleDateString("es-CL")}</td>
+                      <td className="px-4 py-2.5 text-xs text-[#6B7280] hidden sm:table-cell">{new Date(o.createdAt).toLocaleDateString("es-CL")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -484,7 +612,7 @@ export function ReportsPage() {
             ) : activeTab === "shipments" ? (
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">
+                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
                     <th className="px-4 py-2.5">Tracking</th>
                     <th className="px-4 py-2.5">Pedido</th>
                     <th className="px-4 py-2.5">Estado</th>
@@ -500,8 +628,8 @@ export function ReportsPage() {
                       <td className="px-4 py-2.5">
                         <span className="rounded px-2 py-0.5 text-[10px] font-bold bg-[#F5F7F9]">{s.stage.replace(/_/g, " ")}</span>
                       </td>
-                      <td className="px-4 py-2.5 text-[#939FAD] hidden sm:table-cell">{s.carrier}</td>
-                      <td className="px-4 py-2.5 text-xs text-[#939FAD] hidden sm:table-cell">{new Date(s.createdAt ?? "").toLocaleDateString("es-CL")}</td>
+                      <td className="px-4 py-2.5 text-[#6B7280] hidden sm:table-cell">{s.carrier}</td>
+                      <td className="px-4 py-2.5 text-xs text-[#6B7280] hidden sm:table-cell">{new Date(s.createdAt ?? "").toLocaleDateString("es-CL")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -509,7 +637,7 @@ export function ReportsPage() {
             ) : (
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">
+                  <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
                     <th className="px-4 py-2.5">SKU</th>
                     <th className="px-4 py-2.5">Stock</th>
                     <th className="px-4 py-2.5">Estado</th>

@@ -1,6 +1,6 @@
-package com.inventory_service.config;
+package com.smartlogix.orders_service.config;
 
-import com.inventory_service.repository.InventoryRepository;
+import com.smartlogix.orders_service.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class DataLoader implements CommandLineRunner {
 
-    private final InventoryRepository inventoryRepository;
+    private final CustomerRepository customerRepository;
 
     @Override
     public void run(String... args) throws Exception {

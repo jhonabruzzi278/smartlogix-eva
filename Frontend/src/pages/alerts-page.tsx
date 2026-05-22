@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
-import { fallbackAlerts, orders as fallbackOrders, products as fallbackProducts, shipments as fallbackShipments } from "@/data/mock-data";
+import { fallbackAlerts } from "@/data/mock-data";
 import { useApiQuery, type ApiSource } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -27,25 +27,21 @@ export function AlertsPage() {
 
   const { data: orders, source: ordersSource, error: ordersError, refresh: refreshOrders } = useApiQuery<ApiOrder[], Order[]>({
     path: "/api/orders",
-    fallbackData: fallbackOrders,
     transform: (response) => response.map(adaptOrder)
   });
 
   const { data: inventory, source: inventorySource, error: inventoryError, refresh: refreshInventory } = useApiQuery<ApiInventory[], Product[]>({
     path: "/api/inventory",
-    fallbackData: fallbackProducts,
     transform: (response) => response.map(adaptInventory)
   });
 
   const { data: shipments, source: shipmentsSource, error: shipmentsError, refresh: refreshShipments } = useApiQuery<ApiShipment[], Shipment[]>({
     path: "/api/shipments",
-    fallbackData: fallbackShipments,
     transform: (response) => response.map(adaptShipment)
   });
 
   const { data: notifications, source: notificationsSource, error: notificationsError, refresh: refreshNotifications } = useApiQuery<ApiNotificationRecord[], ApiNotificationRecord[]>({
     path: "/api/notifications/audience/OPERATOR",
-    fallbackData: [],
     transform: (response) => response
   });
 

@@ -22,7 +22,7 @@ public class ShippingService {
     private final NotificationPublisher notificationPublisher;
 
     @Transactional
-    public Shipment createShipment(Long orderId, Long customerId, Long sku, Integer quantity) {
+    public Shipment createShipment(Long orderId, Long customerId, String sku, Integer quantity) {
         log.info("[SHIPPING] Creando envio para Orden ID: {}, Cliente: {}, SKU: {}, Cantidad: {}",
                 orderId, customerId, sku, quantity);
 
@@ -31,7 +31,7 @@ public class ShippingService {
                 .customerId(customerId)
                 .sku(sku)
                 .quantity(quantity)
-                .status(ShipmentStatus.PENDING)
+                .status(ShipmentStatus.LABEL_CREATED)
                 .trackingNumber(generateTrackingNumber())
                 .createdAt(LocalDateTime.now())
                 .build();

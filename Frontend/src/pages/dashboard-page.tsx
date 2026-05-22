@@ -24,18 +24,18 @@ function usePwaInstallPrompt() {
 
   return { canInstall, promptInstall };
 }
-import { ArrowRight, Boxes, Bell, Clock, Package, ShoppingBag, Truck } from "lucide-react";
+import { ArrowRight, Banknote, Boxes, Bell, Clock, Package, ShoppingBag, ShoppingCart, Truck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/auth";
 import { getRoleProfile } from "@/app/access";
-import { fallbackAlerts, orders as fallbackOrders, products as fallbackProducts, shipments as fallbackShipments } from "@/data/mock-data";
+import { fallbackAlerts } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { adaptInventory, adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { buildOperationalAlerts } from "@/lib/operational-insights";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { ApiInventory, ApiNotificationRecord, ApiOrder, ApiShipment } from "@/types/api";
-import type { AlertItem, Order, Product, Shipment } from "@/types/domain";
+import type { AlertItem, Order, Product, Sale, Shipment } from "@/types/domain";
 
 const quickActions = [
   { label: "Nuevo pedido", href: "/orders", icon: ShoppingBag, color: "bg-[#4B98CF]" },
@@ -51,30 +51,48 @@ export function DashboardPage() {
   const profile = session ? getRoleProfile(session.role) : null;
 
   const { data: orders, loading: ordersLoading } = useApiQuery<ApiOrder[], Order[]>({
-    path: "/api/orders", fallbackData: fallbackOrders, transform: (r) => r.map(adaptOrder)
+    path: "/api/orders", transform: (r) => r.map(adaptOrder)
   });
   const { data: inventory, loading: inventoryLoading } = useApiQuery<ApiInventory[], Product[]>({
-    path: "/api/inventory", fallbackData: fallbackProducts, transform: (r) => r.map(adaptInventory)
+    path: "/api/inventory", transform: (r) => r.map(adaptInventory)
   });
   const { data: shipments, loading: shipmentsLoading } = useApiQuery<ApiShipment[], Shipment[]>({
-    path: "/api/shipments", fallbackData: fallbackShipments, transform: (r) => r.map(adaptShipment)
+    path: "/api/shipments", transform: (r) => r.map(adaptShipment)
   });
 
   const loading = ordersLoading || inventoryLoading || shipmentsLoading;
 
-  const { operationalOrders, operationalInventory, operationalShipments, validationQueue, stockQueue } = useOperationalWorkspace({ orders, inventory, shipments });
+  const { operationalOrders, operationalInventory, operationalShipments, validationQueue, stockQueue, getAllSales } = useOperationalWorkspace({ orders, inventory, shipments });
 
   const alerts = useMemo<AlertItem[]>(() => {
     const derived = buildOperationalAlerts({ orders: operationalOrders, inventory: operationalInventory, shipments: operationalShipments, notifications: [] });
     return derived.length > 0 ? derived : fallbackAlerts;
   }, [operationalInventory, operationalOrders, operationalShipments]);
 
+  const [allSales, setAllSales] = useState<Sale[]>([]);
+
+  useEffect(() => {
+    getAllSales().then(setAllSales).catch(() => setAllSales([]));
+  }, [getAllSales]);
+
+  const todaySales = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todaysSales = (allSales ?? []).filter((s) => new Date(s.createdAt) >= today);
+    const totalAmount = todaysSales.reduce((sum, s) => sum + s.total, 0);
+    const avgTicket = todaysSales.length > 0 ? Math.round(totalAmount / todaysSales.length) : 0;
+    return { count: todaysSales.length, total: totalAmount, avgTicket };
+  }, [allSales]);
+
   const metrics = useMemo(() => ({
     totalOrders: operationalOrders.length,
     activeShipments: operationalShipments.filter((s) => s.stage !== "delivered").length,
     lowStock: stockQueue.length,
     criticalAlerts: alerts.filter((a) => a.severity === "critical").length,
-  }), [operationalOrders.length, operationalShipments, stockQueue.length, alerts]);
+    salesToday: todaySales.total,
+    salesCount: todaySales.count,
+    avgTicket: todaySales.avgTicket,
+  }), [operationalOrders.length, operationalShipments, stockQueue.length, alerts, todaySales]);
 
   if (!session) return null;
 
@@ -114,8 +132,35 @@ export function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <div className="rounded border border-border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Ventas hoy</p>
+            <ShoppingCart className="h-4 w-4 text-[#4EB4A5]" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{formatCurrency(metrics.salesToday)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{metrics.salesCount} transacciones</p>
+        </div>
+
+        <div className="rounded border border-border bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Ticket promedio</p>
+            <Banknote className="h-4 w-4 text-[#4B98CF]" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{formatCurrency(metrics.avgTicket)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Por transaccion</p>
+        </div>
+
+        <div className="rounded border border-border bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Stock bajo</p>
+            <Boxes className="h-4 w-4 text-[#E3AA75]" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{metrics.lowStock}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">SKU con stock bajo</p>
+        </div>
+
+        <div className="rounded border border-border bg-white p-4">
           <div className="flex items-center justify-between">
             <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Pedidos totales</p>
             <ShoppingBag className="h-4 w-4 text-[#4B98CF]" />
@@ -126,29 +171,11 @@ export function DashboardPage() {
 
         <div className="rounded border border-border bg-white p-4">
           <div className="flex items-center justify-between">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Envios activos</p>
-            <Truck className="h-4 w-4 text-[#4EB4A5]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-foreground">{metrics.activeShipments}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">En seguimiento</p>
-        </div>
-
-        <div className="rounded border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Stock bajo</p>
-            <Boxes className="h-4 w-4 text-[#E3AA75]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-foreground">{metrics.lowStock}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">SKU con cobertura baja</p>
-        </div>
-
-        <div className="rounded border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Criticas</p>
-            <Clock className="h-4 w-4 text-red-500" />
+            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-muted-foreground">Alertas</p>
+            <Bell className="h-4 w-4 text-red-500" />
           </div>
           <p className="mt-2 text-2xl font-bold text-foreground">{metrics.criticalAlerts}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Alertas criticas activas</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Criticas activas</p>
         </div>
       </div>
 
@@ -167,6 +194,41 @@ export function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Recent sales */}
+      {allSales.length > 0 && (
+        <div className="rounded border border-border bg-white">
+          <div className="flex items-center justify-between border-b border-[#ECEEF0] px-4 py-3">
+            <h2 className="text-sm font-bold text-foreground">Ventas recientes</h2>
+            <Link to="/reports" className="flex items-center gap-1 text-xs font-semibold text-[#4B98CF] hover:text-[#346384]">
+              Ver reportes <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-[#F5F7F9]">
+            {allSales.slice(0, 5).map((sale) => (
+              <div key={sale.id} className="flex items-center justify-between px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {sale.items.length > 1
+                      ? `${sale.items[0].name} +${sale.items.length - 1} mas`
+                      : sale.items[0].name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {sale.vendorName}
+                    <span className="mx-1.5">&middot;</span>
+                    {new Date(sale.createdAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
+                    <span className="mx-1.5">&middot;</span>
+                    {sale.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}
+                  </p>
+                </div>
+                <span className="ml-3 shrink-0 text-sm font-bold text-[#4EB4A5]">
+                  {formatCurrency(sale.total)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main content: side panel first on mobile, side by side on desktop */}
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">

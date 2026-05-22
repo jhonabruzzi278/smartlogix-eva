@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
-import { Download, Minus, Plus, Search } from "lucide-react";
+﻿import { useMemo, useState } from "react";
+import { Download, Minus, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { products as fallbackProducts } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
@@ -9,23 +8,45 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { adaptInventory } from "@/lib/api-adapters";
 import { exportInventoryCSV } from "@/lib/export-csv";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ApiInventory } from "@/types/api";
-import type { Product } from "@/types/domain";
+import type { Product, ProductCategory } from "@/types/domain";
 
 export function InventoryPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "critical" | "warning" | "healthy">("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState({ sku: "", name: "", category: "bebidas" as ProductCategory, stock: 0, price: 0, cost: 0 });
+  const [formError, setFormError] = useState("");
   const { can } = usePermissions();
   const canAdjust = can("inventory.adjust");
 
   const { data: inventory, loading, refresh } = useApiQuery<ApiInventory[], Product[]>({
-    path: "/api/inventory", fallbackData: fallbackProducts, transform: (r) => r.map(adaptInventory)
+    path: "/api/inventory", transform: (r) => r.map(adaptInventory)
   });
 
   useAutoRefresh(() => { if (!loading) refresh(); }, 10000);
 
-  const { operationalInventory, adjustInventory } = useOperationalWorkspace({ inventory });
+  const { operationalInventory, adjustInventory, addProduct, deleteProduct } = useOperationalWorkspace({ inventory });
+
+  async function handleAdjust(product: Product, delta: number, reason: string) {
+    await adjustInventory(product, delta, reason);
+    refresh();
+  }
+
+  async function handleAdd(data: { sku: string; name: string; stock: number; price: number; cost: number; category: ProductCategory }) {
+    await addProduct(data);
+    refresh();
+  }
+
+  async function handleDelete(sku: string) {
+    await deleteProduct(sku);
+    refresh();
+  }
 
   const filtered = useMemo(() => {
     let list = operationalInventory;
@@ -50,17 +71,101 @@ export function InventoryPage() {
     <div className="space-y-4 max-w-sm w-full mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#939FAD]">Inventario</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Inventario</p>
           <h1 className="text-xl font-bold text-[#112b4a]">Control de stock</h1>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => exportInventoryCSV(operationalInventory.map(p => ({ sku: String(p.sku), stock: p.stock, status: String(p.status), coverageDays: p.coverageDays, updatedAt: p.updatedAt })))}
-            className="flex items-center gap-1 rounded border border-border bg-white px-3 py-1.5 text-xs font-semibold text-[#939FAD] hover:text-[#112b4a]"
+            onClick={() => exportInventoryCSV(operationalInventory.map(p => ({ sku: String(p.sku), stock: p.stock, status: String(p.status), updatedAt: p.updatedAt })))}
+            className="flex items-center gap-1 rounded border border-border bg-white px-3 py-1.5 text-xs font-semibold text-[#6B7280] hover:text-[#112b4a]"
           >
             <Download className="h-3.5 w-3.5" /> Exportar
           </button>
-          <span className="text-xs text-[#939FAD]">{counts.total} SKU · {counts.totalUnits} unids totales</span>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setFormError(""); } }}>
+            <DialogTrigger render={<Button className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold bg-[#4B98CF] hover:bg-[#346384] text-white"><PackagePlus className="h-3.5 w-3.5" />Agregar producto</Button>} />
+            <DialogContent showCloseButton={false}>
+              <DialogHeader>
+                <DialogTitle>Nuevo producto</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setFormError("");
+                if (!form.sku.trim() || !form.name.trim()) { setFormError("SKU y Nombre son obligatorios"); return; }
+                if (form.stock < 0 || form.price < 0 || form.cost < 0) { setFormError("Stock, Precio y Costo no pueden ser negativos"); return; }
+                await handleAdd({ sku: form.sku, name: form.name, category: form.category, stock: form.stock, price: form.price, cost: form.cost });
+                setForm({ sku: "", name: "", category: "bebidas", stock: 0, price: 0, cost: 0 });
+                setDialogOpen(false);
+              }} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">SKU</label>
+                    <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="COCA-COLA-2L" className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Categoria</label>
+                    <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v as ProductCategory })}>
+                      <SelectTrigger size="sm" className="h-9 w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bebidas">Bebidas</SelectItem>
+                        <SelectItem value="galletas">Galletas</SelectItem>
+                        <SelectItem value="dulces">Dulces</SelectItem>
+                        <SelectItem value="otros">Otros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Nombre</label>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Coca-Cola 2L" className="h-9 text-sm" />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Stock</label>
+                    <Input type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })} className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Precio venta $</label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.price > 0 ? form.price.toLocaleString("es-CL") : ""}
+                      placeholder="2.500"
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                        setForm({ ...form, price: parseInt(raw) || 0 });
+                      }}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Precio compra $</label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.cost > 0 ? form.cost.toLocaleString("es-CL") : ""}
+                      placeholder="1.500"
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                        setForm({ ...form, cost: parseInt(raw) || 0 });
+                      }}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+                {(form.price > 0 || form.cost > 0) && (
+                  <p className="text-xs font-medium text-[#4EB4A5]">
+                    Ganancia por unidad: ${(form.price - form.cost).toLocaleString("es-CL")}
+                  </p>
+                )}
+                {formError && <p className="text-xs text-red-500">{formError}</p>}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button type="button" variant="outline" size="sm" onClick={() => { setDialogOpen(false); setFormError(""); }}>Cancelar</Button>
+                  <Button type="submit" size="sm" className="bg-[#4B98CF] hover:bg-[#346384] text-white">Guardar</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <span className="text-xs text-[#6B7280]">{counts.total} SKU · {counts.totalUnits} unids totales</span>
         </div>
       </div>
 
@@ -98,7 +203,6 @@ export function InventoryPage() {
                 <th className="px-4 py-3 w-6"></th>
                 <th className="px-4 py-3">SKU</th>
                 <th className="px-4 py-3">Stock</th>
-                <th className="px-4 py-3 hidden sm:table-cell">Cobertura</th>
                 <th className="px-4 py-3 hidden md:table-cell">Estado</th>
                 <th className="px-4 py-3 text-right">{canAdjust ? "Ajuste" : ""}</th>
               </tr>
@@ -107,12 +211,21 @@ export function InventoryPage() {
             {filtered.map((product) => (
               <tr key={product.sku} className="border-b border-[#F5F7F9] hover:bg-[#F5F7F9] cursor-pointer" onClick={() => navigate(`/inventory/${product.sku}`)}>
                 <td className="px-4 py-3">
-                  <div className={cn(
-                    "h-2.5 w-2.5 rounded-full",
-                    product.status === "healthy" && "bg-[#4EB4A5]",
-                    product.status === "warning" && "bg-[#E3AA75]",
-                    product.status === "critical" && "bg-red-500",
-                  )} />
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "h-2.5 w-2.5 rounded-full shrink-0",
+                      product.status === "healthy" && "bg-[#4EB4A5]",
+                      product.status === "warning" && "bg-[#E3AA75]",
+                      product.status === "critical" && "bg-red-500",
+                    )} />
+                    {product.isCustom && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(product.sku); }}
+                        className="p-0.5 rounded text-red-400 hover:bg-red-50 hover:text-red-600"
+                        title="Eliminar producto"
+                      ><Trash2 className="h-3.5 w-3.5" /></button>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 font-bold text-[#4B98CF] hover:underline"><Link to={`/inventory/${product.sku}`} onClick={(e) => e.stopPropagation()}>{product.sku}</Link></td>
                 <td className="px-4 py-3">
@@ -126,8 +239,7 @@ export function InventoryPage() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{product.coverageDays}d</td>
-                <td className="px-4 py-3 hidden md:table-cell">
+                <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
                   <span className={cn(
                     "rounded px-2 py-0.5 text-xs font-bold",
                     product.status === "healthy" && "bg-[#4EB4A5]/10 text-[#4EB4A5]",
@@ -139,19 +251,23 @@ export function InventoryPage() {
                 </td>
                 <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                   {canAdjust && (
-                    <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                    <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                       <button
-                        onClick={() => adjustInventory(product, -1, "Reserva manual")}
+                        onClick={() => handleAdjust(product, -10, "Reserva -10")}
+                        className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] sm:min-h-[44px] px-1.5 sm:px-2 text-[10px] sm:text-xs font-semibold text-red-500 hover:bg-red-50 active:scale-[0.98]"
+                      >-10</button>
+                      <button
+                        onClick={() => handleAdjust(product, -1, "Reserva manual")}
                         className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       ><Minus className="h-4 w-4" /></button>
                       <button
-                        onClick={() => adjustInventory(product, 1, "Reposicion rapida")}
+                        onClick={() => handleAdjust(product, 1, "Reposicion rapida")}
                         className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-green-600 hover:bg-green-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       ><Plus className="h-4 w-4" /></button>
                       <button
-                        onClick={() => adjustInventory(product, 5, "Reposicion +5")}
-                        className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] sm:min-h-[44px] px-2 sm:px-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted active:scale-[0.98] bg-card"
-                      >+5</button>
+                        onClick={() => handleAdjust(product, 10, "Reposicion +10")}
+                        className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] sm:min-h-[44px] px-1.5 sm:px-2 text-[10px] sm:text-xs font-semibold text-green-600 hover:bg-green-50 active:scale-[0.98]"
+                      >+10</button>
                     </div>
                   )}
                 </td>
@@ -159,7 +275,7 @@ export function InventoryPage() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-xs text-[#939FAD]">Sin productos que coincidan con el filtro</td>
+                <td colSpan={5} className="px-4 py-12 text-center text-xs text-[#6B7280]">Sin productos que coincidan con el filtro</td>
               </tr>
             )}
           </tbody>

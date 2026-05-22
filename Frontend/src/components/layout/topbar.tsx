@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { Bell, LogOut, Menu, Moon, MoreVertical, Sun, Truck, User } from "lucide-react";
+﻿import { useEffect, useRef, useState } from "react";
+import { Bell, LogOut, Menu, MoreVertical, Truck, User } from "lucide-react";
 import { Link } from "react-router-dom";
-import { managedUsers } from "@/app/user-directory";
 import { getDefaultPathForRole } from "@/app/access";
-import { getVisibleNavItems } from "@/components/layout/navigation";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/domain";
 
@@ -14,8 +12,6 @@ interface TopbarProps {
   role: Role;
   sessionName: string;
   sessionUsername: string;
-  dark: boolean;
-  onToggleDark: () => void;
 }
 
 const roleLabel: Record<Role, string> = {
@@ -24,7 +20,8 @@ const roleLabel: Record<Role, string> = {
   warehouse: "Bodega",
   support: "Soporte",
   customer: "Cliente",
-  shipper: "Transportista"
+  shipper: "Transportista",
+  vendor: "Vendedor"
 };
 
 const roleInitial: Record<Role, string> = {
@@ -33,7 +30,8 @@ const roleInitial: Record<Role, string> = {
   warehouse: "BO",
   support: "SO",
   customer: "CL",
-  shipper: "TR"
+  shipper: "TR",
+  vendor: "VE"
 };
 
 interface Notification {
@@ -45,7 +43,7 @@ interface Notification {
   time: string;
 }
 
-export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUsername, dark, onToggleDark }: TopbarProps) {
+export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUsername }: TopbarProps) {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const notifyRef = useRef<HTMLDivElement>(null);
@@ -65,26 +63,6 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
   }, []);
 
   const notifications: Notification[] = [
-    ...(() => {
-      const items: Notification[] = [];
-      try {
-        const assignments = JSON.parse(localStorage.getItem("smartlogix-order-transporter-assignments") ?? "{}");
-        let i = 0;
-        for (const [orderId, username] of Object.entries(assignments).slice(-2)) {
-          const t = managedUsers.find((u) => u.username === username);
-          items.push({
-            id: `topbar-asgn-${orderId}`,
-            avatar: "shipment",
-            avatarInitials: "TR",
-            avatarClass: "bg-[#4EB4A5]",
-            message: `Pedido #${orderId} asignado a ${t?.name?.split(" ")[0] ?? username}`,
-            time: "Recien",
-          });
-          i++;
-        }
-      } catch {}
-      return items;
-    })(),
     {
       id: "1",
       avatar: "order",
@@ -130,16 +108,6 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
       </div>
 
       <div className="flex items-center gap-1">
-        {/* Dark mode toggle */}
-        <button
-          type="button"
-          onClick={onToggleDark}
-          className="inline-flex h-10 w-10 items-center justify-center rounded text-white/70 hover:bg-white/10 hover:text-white"
-          title={dark ? "Modo claro" : "Modo oscuro"}
-        >
-          {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </button>
-
         {/* Notifications */}
         <div className="relative" ref={notifyRef}>
           <button
@@ -155,7 +123,7 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
             <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded border border-[#DCE0E2] bg-white shadow-lg">
               <div className="flex items-center justify-between px-4 py-3">
                 <span className="text-sm font-bold text-[#112b4a]">Notifications</span>
-                <button className="text-xs text-[#939FAD] hover:text-[#112b4a]">Clear all</button>
+                <button className="text-xs text-[#6B7280] hover:text-[#112b4a]">Clear all</button>
               </div>
 
               <div className="max-h-[280px] overflow-y-auto">
@@ -169,7 +137,7 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs text-[#112b4a]">{n.message}</p>
-                      <p className="mt-0.5 text-[11px] text-[#939FAD]">{n.time}</p>
+                      <p className="mt-0.5 text-[11px] text-[#6B7280]">{n.time}</p>
                     </div>
                   </div>
                 ))}
@@ -199,7 +167,7 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
             <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded border border-[#DCE0E2] bg-white shadow-lg">
               <div className="px-4 py-3">
                 <p className="text-sm font-bold text-[#112b4a]">{sessionName}</p>
-                <p className="text-xs text-[#939FAD]">{sessionUsername}</p>
+                <p className="text-xs text-[#6B7280]">{sessionUsername}</p>
               </div>
 
               <div className="border-t border-[#ECEEF0]" />
@@ -209,7 +177,7 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
                 onClick={() => setProfileOpen(false)}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#112b4a] hover:bg-[#F5F7F9]"
               >
-                <User className="h-4 w-4 text-[#939FAD]" />
+                <User className="h-4 w-4 text-[#6B7280]" />
                 Dashboard
               </Link>
 
@@ -218,7 +186,7 @@ export function Topbar({ title, onMenu, onLogout, role, sessionName, sessionUser
                 onClick={() => setProfileOpen(false)}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#112b4a] hover:bg-[#F5F7F9]"
               >
-                <User className="h-4 w-4 text-[#939FAD]" />
+                <User className="h-4 w-4 text-[#6B7280]" />
                 Mi perfil
               </Link>
 

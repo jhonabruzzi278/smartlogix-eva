@@ -51,13 +51,11 @@ export const inventoryColumns: ColumnDef<{
   sku: string;
   stock: number;
   status: string;
-  coverageDays: number;
   updatedAt: string;
 }>[] = [
   { header: "SKU", accessor: (p) => p.sku },
   { header: "Stock", accessor: (p) => p.stock },
   { header: "Estado", accessor: (p) => p.status },
-  { header: "Cobertura (dias)", accessor: (p) => p.coverageDays },
   { header: "Actualizado", accessor: (p) => p.updatedAt }
 ];
 
@@ -83,10 +81,30 @@ export function exportOrdersCSV(orders: Array<{ id: string; customer: string; sk
   exportCSV(orders, orderColumns, `pedidos-${today()}.csv`);
 }
 
-export function exportInventoryCSV(products: Array<{ sku: string; stock: number; status: string; coverageDays: number; updatedAt: string }>) {
+export function exportInventoryCSV(products: Array<{ sku: string; stock: number; status: string; updatedAt: string }>) {
   exportCSV(products, inventoryColumns, `inventario-${today()}.csv`);
 }
 
 export function exportShipmentsCSV(shipments: Array<{ id: string; tracking: string; orderId: string; sku: string; stage: string; carrier: string; createdAt: string }>) {
   exportCSV(shipments, shipmentColumns, `envios-${today()}.csv`);
+}
+
+export const salesColumns: ColumnDef<{
+  id: string;
+  items: string;
+  vendorName: string;
+  total: number;
+  paymentMethod: string;
+  createdAt: string;
+}>[] = [
+  { header: "Venta #", accessor: (s) => s.id },
+  { header: "Items", accessor: (s) => s.items },
+  { header: "Vendedor", accessor: (s) => s.vendorName },
+  { header: "Total", accessor: (s) => s.total },
+  { header: "Pago", accessor: (s) => s.paymentMethod },
+  { header: "Fecha", accessor: (s) => s.createdAt },
+];
+
+export function exportSalesCSV(sales: Array<{ id: string; items: string; vendorName: string; total: number; paymentMethod: string; createdAt: string }>) {
+  exportCSV(sales, salesColumns, `ventas-${today()}.csv`);
 }

@@ -34,7 +34,7 @@ public class Shipment {
     private Long customerId;
 
     @Column(name = "sku", nullable = false)
-    private Long sku;
+    private String sku;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
@@ -51,4 +51,10 @@ public class Shipment {
 
     @Column(name = "shipped_at")
     private LocalDateTime shippedAt;
+
+    @Column(name = "proof_of_delivery_image", columnDefinition = "TEXT")
+    private String proofOfDeliveryImage;
+
+    @Column(name = "recipient_rut", length = 12)
+    private String recipientRut;
 }

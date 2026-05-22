@@ -1,11 +1,10 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiRequestError, apiClient } from "@/lib/api-client";
 
-export type ApiSource = "live" | "demo";
+export type ApiSource = "live" | "error";
 
 interface UseApiQueryOptions<TResponse, TData> {
   path: string;
-  fallbackData: TData;
   transform: (response: TResponse) => TData;
   enabled?: boolean;
 }
@@ -31,18 +30,14 @@ const mapErrorToMessage = (error: unknown): string => {
 
 export function useApiQuery<TResponse, TData>({
   path,
-  fallbackData,
   transform,
   enabled = true
 }: UseApiQueryOptions<TResponse, TData>): UseApiQueryResult<TData> {
-  const [data, setData] = useState<TData>(fallbackData);
+  const [data, setData] = useState<TData>(null as unknown as TData);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState<ApiSource>("demo");
+  const [source, setSource] = useState<ApiSource>("live");
   const [tick, setTick] = useState(0);
-
-  const fallbackRef = useRef(fallbackData);
-  fallbackRef.current = fallbackData;
 
   const transformRef = useRef(transform);
   transformRef.current = transform;
@@ -53,8 +48,6 @@ export function useApiQuery<TResponse, TData>({
   useEffect(() => {
     if (!enabled) {
       setLoading(false);
-      setData(fallbackRef.current);
-      setSource("demo");
       return;
     }
 
@@ -71,9 +64,8 @@ export function useApiQuery<TResponse, TData>({
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setData(fallbackRef.current);
         setError(mapErrorToMessage(err));
-        setSource("demo");
+        setSource("error");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

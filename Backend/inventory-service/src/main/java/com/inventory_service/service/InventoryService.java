@@ -22,12 +22,45 @@ public class InventoryService {
         return inventoryRepository.findAll();
     }
 
-    public Optional<Inventory> getBySku(Long sku) {
+    public Optional<Inventory> getBySku(String sku) {
         return inventoryRepository.findBySku(sku);
     }
 
     @Transactional
-    public InventoryResponse deductStock(Long orderId, Long sku, Integer quantity) {
+    public Inventory createInventory(Inventory inventory) {
+        inventory.setSku(inventory.getSku().trim().toUpperCase().replaceAll("\\s+", "-"));
+        return inventoryRepository.save(inventory);
+    }
+
+    @Transactional
+    public Optional<Inventory> updateInventory(String sku, Inventory updates) {
+        return inventoryRepository.findBySku(sku).map(existing -> {
+            if (updates.getName() != null) existing.setName(updates.getName());
+            if (updates.getPrice() != null) existing.setPrice(updates.getPrice());
+            if (updates.getCost() != null) existing.setCost(updates.getCost());
+            if (updates.getCategory() != null) existing.setCategory(updates.getCategory());
+            if (updates.getStock() != null) existing.setStock(updates.getStock());
+            return inventoryRepository.save(existing);
+        });
+    }
+
+    @Transactional
+    public boolean deleteInventory(String sku) {
+        if (!inventoryRepository.existsBySku(sku)) return false;
+        inventoryRepository.deleteBySku(sku);
+        return true;
+    }
+
+    @Transactional
+    public Inventory adjustStock(String sku, Integer delta) {
+        Inventory inventory = inventoryRepository.findBySku(sku)
+                .orElseThrow(() -> new RuntimeException("SKU not found: " + sku));
+        inventory.setStock(Math.max(inventory.getStock() + delta, 0));
+        return inventoryRepository.save(inventory);
+    }
+
+    @Transactional
+    public InventoryResponse deductStock(Long orderId, String sku, Integer quantity) {
         if (sku == null || quantity == null || quantity <= 0) {
             return InventoryResponse.builder()
                     .orderId(orderId)

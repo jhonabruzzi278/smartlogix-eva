@@ -43,6 +43,7 @@ function mapBackendRolesToAppRole(roles: string[]): Role {
   if (hasRole(["cliente", "customer"])) return "customer";
   if (hasRole(["soporte", "support"])) return "support";
   if (hasRole(["bodega", "warehouse"])) return "warehouse";
+  if (hasRole(["vendedor", "vendor"])) return "vendor";
 
   return "customer";
 }

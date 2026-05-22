@@ -1,7 +1,6 @@
-import { Boxes, Clock, MapPin, Package, Truck } from "lucide-react";
+﻿import { Boxes, Clock, MapPin, Package, Truck } from "lucide-react";
 import { useAuth } from "@/app/auth";
 import { getRoleProfile } from "@/app/access";
-import { orders as fallbackOrders, shipments as fallbackShipments } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import type { ApiOrder, ApiShipment } from "@/types/api";
@@ -13,13 +12,11 @@ export function ProfilePage() {
 
   const { data: orders } = useApiQuery<ApiOrder[], Order[]>({
     path: "/api/orders",
-    fallbackData: fallbackOrders,
     transform: (response) => response.map(adaptOrder)
   });
 
   const { data: shipments } = useApiQuery<ApiShipment[], Shipment[]>({
     path: "/api/shipments",
-    fallbackData: fallbackShipments,
     transform: (response) => response.map(adaptShipment)
   });
 
@@ -73,35 +70,35 @@ export function ProfilePage() {
         {/* Sidebar */}
         <aside className="w-full shrink-0 lg:w-64">
           <h1 className="text-xl font-bold text-[#112b4a]">{session.name}</h1>
-          <p className="text-sm text-[#939FAD]">{session.username}</p>
+          <p className="text-sm text-[#6B7280]">{session.username}</p>
 
           <div className="mt-4 space-y-2.5 text-sm text-[#112b4a]">
-            <div className="flex items-center gap-2 text-[#939FAD]">
+            <div className="flex items-center gap-2 text-[#6B7280]">
               <Clock className="h-4 w-4 shrink-0" />
               <span>{profile?.label ?? "Usuario"}</span>
             </div>
-            <div className="flex items-center gap-2 text-[#939FAD]">
+            <div className="flex items-center gap-2 text-[#6B7280]">
               <Boxes className="h-4 w-4 shrink-0" />
               <span>SmartLogix v2.0</span>
             </div>
-            <div className="flex items-center gap-2 text-[#939FAD]">
+            <div className="flex items-center gap-2 text-[#6B7280]">
               <MapPin className="h-4 w-4 shrink-0" />
               <span>Entorno local</span>
             </div>
           </div>
 
-          <p className="mt-4 text-sm leading-relaxed text-[#939FAD]">
+          <p className="mt-4 text-sm leading-relaxed text-[#6B7280]">
             {profile?.summary ?? "Perfil operativo de SmartLogix."}
           </p>
 
           {/* Stats */}
           <div className="mt-5 space-y-2">
             <div className="flex items-center justify-between rounded bg-[#F5F7F9] px-3 py-2 text-xs">
-              <span className="text-[#939FAD]">Pedidos</span>
+              <span className="text-[#6B7280]">Pedidos</span>
               <span className="font-bold text-[#112b4a]">{orders?.length ?? 0}</span>
             </div>
             <div className="flex items-center justify-between rounded bg-[#F5F7F9] px-3 py-2 text-xs">
-              <span className="text-[#939FAD]">Envios</span>
+              <span className="text-[#6B7280]">Envios</span>
               <span className="font-bold text-[#112b4a]">{shipments?.length ?? 0}</span>
             </div>
           </div>
@@ -110,7 +107,7 @@ export function ProfilePage() {
         {/* Main content */}
         <div className="min-w-0 flex-1">
           <div className="mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-[1.2px] text-[#939FAD]">
+            <h2 className="text-sm font-bold uppercase tracking-[1.2px] text-[#6B7280]">
               Actividad reciente
             </h2>
           </div>
@@ -131,7 +128,7 @@ export function ProfilePage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <strong className="text-sm text-[#112b4a]">{item.title}</strong>
-                        <span className="shrink-0 text-xs text-[#939FAD]">
+                        <span className="shrink-0 text-xs text-[#6B7280]">
                           {new Date(item.time).toLocaleDateString("es-CL", {
                             day: "numeric",
                             month: "short",
@@ -147,8 +144,8 @@ export function ProfilePage() {
               ))
             ) : (
               <div className="rounded border border-[#DCE0E2] bg-white p-8 text-center">
-                <p className="text-sm text-[#939FAD]">Sin actividad reciente</p>
-                <p className="mt-1 text-xs text-[#939FAD]/70">
+                <p className="text-sm text-[#6B7280]">Sin actividad reciente</p>
+                <p className="mt-1 text-xs text-[#6B7280]/70">
                   Crea pedidos desde la seccion de ordenes para ver actividad aqui.
                 </p>
               </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Check, ChevronDown, Edit2, MoreHorizontal, Search, ShieldCheck, UserPlus, X } from "lucide-react";
 import { getRoleProfile } from "@/app/access";
 import { getVisibleNavItems } from "@/components/layout/navigation";
@@ -7,7 +7,7 @@ import { managedUsers } from "@/app/user-directory";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/domain";
 
-const ROLES: Role[] = ["owner", "ops", "warehouse", "support", "customer", "shipper"];
+const ROLES: Role[] = ["owner", "ops", "warehouse", "support", "customer", "shipper", "vendor"];
 
 interface UserRow {
   username: string;
@@ -105,7 +105,7 @@ export function UsersPage() {
     <div className="space-y-4 max-w-md mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#939FAD]">Administracion</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Administracion</p>
           <h1 className="text-xl font-bold text-[#112b4a]">Usuarios y roles</h1>
         </div>
         <button
@@ -121,22 +121,22 @@ export function UsersPage() {
         <div className="rounded border border-[#DCE0E2] bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#939FAD] mb-1">Nombre</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Nombre</label>
               <input value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="h-9 w-full rounded border border-[#DDE0E2] bg-[#F8FBFD] px-3 text-sm" placeholder="Nombre completo" />
             </div>
             <div className="flex-1">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#939FAD] mb-1">Email</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Email</label>
               <input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="h-9 w-full rounded border border-[#DDE0E2] bg-[#F8FBFD] px-3 text-sm" placeholder="usuario@smartlogix.cl" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#939FAD] mb-1">Rol</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Rol</label>
               <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value as Role })} className="h-9 rounded border border-[#DDE0E2] bg-[#F8FBFD] px-2 text-sm">
                 {ROLES.map((r) => <option key={r} value={r}>{getRoleProfile(r).label}</option>)}
               </select>
             </div>
             <div className="flex gap-2">
               <button onClick={addUser} className="h-9 rounded bg-[#4B98CF] px-4 text-xs font-bold text-white hover:bg-[#346384]">Crear</button>
-              <button onClick={() => setShowAdd(false)} className="h-9 rounded border border-[#DCE0E2] px-3 text-xs font-semibold text-[#939FAD] hover:bg-[#F5F7F9]">Cancelar</button>
+              <button onClick={() => setShowAdd(false)} className="h-9 rounded border border-[#DCE0E2] px-3 text-xs font-semibold text-[#6B7280] hover:bg-[#F5F7F9]">Cancelar</button>
             </div>
           </div>
         </div>
@@ -144,13 +144,13 @@ export function UsersPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#939FAD]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar usuario..." className="h-9 w-full rounded border border-[#DDE0E2] bg-white pl-9 pr-3 text-sm outline-none placeholder:text-[#939FAD]" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar usuario..." className="h-9 w-full rounded border border-[#DDE0E2] bg-white pl-9 pr-3 text-sm outline-none placeholder:text-[#6B7280]" />
         </div>
         <div className="flex gap-1 rounded border border-[#DCE0E2] bg-white p-0.5 overflow-x-auto scroll-x">
-          <button onClick={() => setRoleFilter("all")} className={cn("rounded px-3 py-1 text-[11px] font-semibold transition-colors", roleFilter === "all" ? "bg-[#4B98CF] text-white" : "text-[#939FAD] hover:text-[#112b4a]")}>Todos</button>
+          <button onClick={() => setRoleFilter("all")} className={cn("rounded px-3 py-1 text-[11px] font-semibold transition-colors", roleFilter === "all" ? "bg-[#4B98CF] text-white" : "text-[#6B7280] hover:text-[#112b4a]")}>Todos</button>
           {ROLES.map((r) => (
-            <button key={r} onClick={() => setRoleFilter(r)} className={cn("rounded px-3 py-1 text-[11px] font-semibold transition-colors", roleFilter === r ? "bg-[#4B98CF] text-white" : "text-[#939FAD] hover:text-[#112b4a]")}>{getRoleProfile(r).label}</button>
+            <button key={r} onClick={() => setRoleFilter(r)} className={cn("rounded px-3 py-1 text-[11px] font-semibold transition-colors", roleFilter === r ? "bg-[#4B98CF] text-white" : "text-[#6B7280] hover:text-[#112b4a]")}>{getRoleProfile(r).label}</button>
           ))}
         </div>
       </div>
@@ -164,7 +164,7 @@ export function UsersPage() {
       <div className="rounded border border-[#DCE0E2] bg-white">
         <div className="block sm:hidden">
           {filtered.length === 0 && (
-            <div className="px-4 py-12 text-center text-xs text-[#939FAD]">Sin usuarios que coincidan</div>
+            <div className="px-4 py-12 text-center text-xs text-[#6B7280]">Sin usuarios que coincidan</div>
           )}
           <div className="flex flex-col gap-3 p-3">
             {filtered.map((user) => (
@@ -175,11 +175,11 @@ export function UsersPage() {
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-[#112b4a]">{user.name}</p>
-                    <p className="text-xs text-[#939FAD]">{user.username}</p>
+                    <p className="text-xs text-[#6B7280]">{user.username}</p>
                   </div>
-                  <button className="rounded p-1 text-[#939FAD] hover:bg-[#F5F7F9]"><MoreHorizontal className="h-4 w-4" /></button>
+                  <button className="rounded p-1 text-[#6B7280] hover:bg-[#F5F7F9]"><MoreHorizontal className="h-4 w-4" /></button>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs text-[#939FAD]">
+                <div className="flex flex-wrap gap-2 text-xs text-[#6B7280]">
                   <span className="font-semibold text-[#4B98CF]">{getRoleProfile(user.role).label}</span>
                   <span>{user.team}</span>
                   <span>{new Date(user.lastLogin).toLocaleDateString("es-CL")}</span>
@@ -189,7 +189,7 @@ export function UsersPage() {
                   {user.modules.slice(0, 3).map((m) => (
                     <span key={m} className="rounded bg-[#E3AA75]/10 px-2 py-0.5 text-[10px] text-[#E3AA75]">{m}</span>
                   ))}
-                  {user.modules.length > 3 && <span className="text-[10px] text-[#939FAD]">+{user.modules.length - 3}</span>}
+                  {user.modules.length > 3 && <span className="text-[10px] text-[#6B7280]">+{user.modules.length - 3}</span>}
                 </div>
                 <div className="flex gap-2 mt-2">
                   <button
@@ -217,7 +217,7 @@ export function UsersPage() {
                     >
                       {ROLES.map((r) => <option key={r} value={r}>{getRoleProfile(r).label}</option>)}
                     </select>
-                    <button onClick={() => setEditingUser(null)} className="p-1 text-[#939FAD] hover:text-[#112b4a]"><X className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => setEditingUser(null)} className="p-1 text-[#6B7280] hover:text-[#112b4a]"><X className="h-3.5 w-3.5" /></button>
                   </div>
                 )}
               </div>
@@ -228,7 +228,7 @@ export function UsersPage() {
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">
+              <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
                 <th className="px-4 py-3 w-10"></th>
                 <th className="px-4 py-3">Usuario</th>
                 <th className="px-4 py-3 hidden sm:table-cell">Equipo</th>
@@ -249,9 +249,9 @@ export function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[#112b4a]">{user.name}</p>
-                    <p className="text-xs text-[#939FAD]">{user.username}</p>
+                    <p className="text-xs text-[#6B7280]">{user.username}</p>
                   </td>
-                  <td className="px-4 py-3 text-[#939FAD] hidden sm:table-cell">{user.team}</td>
+                  <td className="px-4 py-3 text-[#6B7280] hidden sm:table-cell">{user.team}</td>
                   <td className="px-4 py-3">
                     {editingUser === user.username ? (
                       <div className="flex items-center gap-1">
@@ -262,7 +262,7 @@ export function UsersPage() {
                         >
                           {ROLES.map((r) => <option key={r} value={r}>{getRoleProfile(r).label}</option>)}
                         </select>
-                        <button onClick={() => setEditingUser(null)} className="p-1 text-[#939FAD] hover:text-[#112b4a]"><X className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => setEditingUser(null)} className="p-1 text-[#6B7280] hover:text-[#112b4a]"><X className="h-3.5 w-3.5" /></button>
                       </div>
                     ) : (
                       <button
@@ -285,24 +285,24 @@ export function UsersPage() {
                       <div className={cn("h-5 w-5 rounded-full bg-white shadow transition-transform", user.active ? "translate-x-4" : "")} />
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-xs text-[#939FAD] hidden md:table-cell">
+                  <td className="px-4 py-3 text-xs text-[#6B7280] hidden md:table-cell">
                     {new Date(user.lastLogin).toLocaleDateString("es-CL")}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {user.modules.slice(0, 3).map((m) => (
-                        <span key={m} className="rounded bg-[#F5F7F9] px-1.5 py-0.5 text-[10px] text-[#939FAD]">{m}</span>
+                        <span key={m} className="rounded bg-[#F5F7F9] px-1.5 py-0.5 text-[10px] text-[#6B7280]">{m}</span>
                       ))}
-                      {user.modules.length > 3 && <span className="text-[10px] text-[#939FAD]">+{user.modules.length - 3}</span>}
+                      {user.modules.length > 3 && <span className="text-[10px] text-[#6B7280]">+{user.modules.length - 3}</span>}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button className="rounded p-1 text-[#939FAD] hover:bg-[#F5F7F9]"><MoreHorizontal className="h-4 w-4" /></button>
+                    <button className="rounded p-1 text-[#6B7280] hover:bg-[#F5F7F9]"><MoreHorizontal className="h-4 w-4" /></button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-[#939FAD]">Sin usuarios que coincidan</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-[#6B7280]">Sin usuarios que coincidan</td></tr>
               )}
             </tbody>
           </table>
@@ -313,7 +313,7 @@ export function UsersPage() {
       <div className="rounded border border-[#DCE0E2] bg-white">
         <button onClick={() => setShowMatrix(!showMatrix)} className="flex w-full items-center justify-between px-4 py-3 text-left">
           <h2 className="text-sm font-bold text-[#112b4a]">Matriz de permisos por rol</h2>
-          <ChevronDown className={cn("h-4 w-4 text-[#939FAD] transition-transform", showMatrix && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 text-[#6B7280] transition-transform", showMatrix && "rotate-180")} />
         </button>
         {showMatrix && (
           <div className="overflow-x-auto border-t border-[#ECEEF0] p-4">

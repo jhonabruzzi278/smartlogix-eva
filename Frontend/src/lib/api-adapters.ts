@@ -1,5 +1,5 @@
-import type { ApiInventory, ApiNotificationRecord, ApiOrder, ApiShipment } from "@/types/api";
-import type { HealthState, Order, OrderStage, Product, Shipment, ShipmentStage, TimelineEvent } from "@/types/domain";
+import type { ApiCustomer, ApiInventory, ApiNotificationRecord, ApiOrder, ApiShipment } from "@/types/api";
+import type { Customer, HealthState, Order, OrderStage, Product, Shipment, ShipmentStage, TimelineEvent } from "@/types/domain";
 
 type StatusMap<T extends string> = readonly (readonly [string, T])[];
 
@@ -54,15 +54,11 @@ export function calculateHealthFromStock(stock: number): HealthState {
   return "healthy";
 }
 
-export function calculateCoverageDays(stock: number): number {
-  if (stock <= 0) return 0;
-  return Math.max(2, Math.round(stock / 2));
-}
-
-export function adaptOrder(apiOrder: ApiOrder): Order {
+export function adaptOrder(apiOrder: ApiOrder, customerName?: string): Order {
   return {
     id: String(apiOrder.id),
-    customer: String(apiOrder.customerId),
+    customer: customerName ?? `Cliente #${apiOrder.customerId}`,
+    customerId: String(apiOrder.customerId),
     source: "Sincronizacion BD",
     stage: normalizeOrderStage(apiOrder.status),
     sku: String(apiOrder.sku),
@@ -76,18 +72,21 @@ export function adaptOrder(apiOrder: ApiOrder): Order {
         quantity: apiOrder.quantity
       }
     ],
-    timeline: []
+    timeline: [],
+    assignedTo: apiOrder.assignedTo ?? undefined
   };
 }
 
 export function adaptInventory(apiInventory: ApiInventory): Product {
   return {
     id: String(apiInventory.id),
-    sku: String(apiInventory.sku),
-    name: String(apiInventory.sku),
+    sku: apiInventory.sku,
+    name: apiInventory.name,
     stock: apiInventory.stock,
+    price: apiInventory.price,
+    cost: apiInventory.cost,
+    category: apiInventory.category,
     status: calculateHealthFromStock(apiInventory.stock),
-    coverageDays: calculateCoverageDays(apiInventory.stock),
     updatedAt: new Date().toISOString()
   };
 }
@@ -106,7 +105,9 @@ export function adaptShipment(apiShipment: ApiShipment): Shipment {
     eta: apiShipment.shippedAt ?? apiShipment.createdAt ?? null,
     createdAt: apiShipment.createdAt ?? new Date().toISOString(),
     shippedAt: apiShipment.shippedAt ?? null,
-    exception: stage === "delayed" ? "El servicio de envios reporto una demora que requiere seguimiento." : undefined
+    exception: stage === "delayed" ? "El servicio de envios reporto una demora que requiere seguimiento." : undefined,
+    proofOfDeliveryImage: apiShipment.proofOfDeliveryImage ?? null,
+    recipientRut: apiShipment.recipientRut ?? null
   };
 }
 
@@ -125,4 +126,15 @@ export function adaptNotifications(records: ApiNotificationRecord[]): TimelineEv
 
 export function normalizeIntegrationHealth(rawStatus: string): HealthState {
   return normalizeHealth(rawStatus);
+}
+
+export function adaptCustomer(apiCustomer: ApiCustomer): Customer {
+  return {
+    id: String(apiCustomer.id),
+    name: apiCustomer.name,
+    phone: apiCustomer.phone ?? undefined,
+    address: apiCustomer.address ?? undefined,
+    email: apiCustomer.email ?? undefined,
+    createdAt: apiCustomer.createdAt ?? new Date().toISOString()
+  };
 }

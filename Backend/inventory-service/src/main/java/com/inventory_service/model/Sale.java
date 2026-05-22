@@ -11,32 +11,34 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "inventory")
+@Table(name = "sales")
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class Inventory {
+public class Sale {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String sku;
+    @Column(nullable = false)
+    private String items;
 
     @Column(nullable = false)
-    private String name;
+    private Integer total;
 
     @Column(nullable = false)
-    private Integer stock;
+    private String paymentMethod;
 
     @Column(nullable = false)
-    private Integer price;
+    private String vendorId;
 
     @Column(nullable = false)
-    private Integer cost;
+    private String vendorName;
 
     @Column(nullable = false)
-    private String category;
+    private LocalDateTime createdAt;
 }

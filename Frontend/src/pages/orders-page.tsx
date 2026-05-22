@@ -1,50 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Download, FileUp, Plus, RotateCw, Search, Truck, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Download, FileUp, Plus, RotateCw, Search, Truck, User, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/auth";
 import { managedUsers } from "@/app/user-directory";
-import { orders as fallbackOrders } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { usePermissions } from "@/hooks/use-permissions";
-import { adaptOrder } from "@/lib/api-adapters";
+import { adaptCustomer, adaptInventory, adaptOrder } from "@/lib/api-adapters";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { exportOrdersCSV } from "@/lib/export-csv";
 import { addHistoryEntry } from "@/lib/order-history";
 import { cn } from "@/lib/utils";
-import type { ApiCreateOrderRequest, ApiCreateOrderResponse, ApiOrder } from "@/types/api";
-import type { Order, Role } from "@/types/domain";
+import type { ApiCreateOrderRequest, ApiCreateOrderResponse, ApiCustomer, ApiInventory, ApiOrder } from "@/types/api";
+import type { Customer, Order, Product, Role } from "@/types/domain";
+import type { OrderDecisionType } from "@/hooks/use-operational-workspace";
 
 const TRANSPORTERS = managedUsers
   .filter((u) => u.role === "shipper")
   .map((u) => ({ username: u.username, name: u.name }));
 
-const ASSIGNMENTS_KEY = "smartlogix-order-transporter-assignments";
-
-function readAssignments(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(ASSIGNMENTS_KEY) ?? "{}");
-  } catch { return {}; }
-}
-
-function saveAssignment(orderId: string, transporter: string) {
-  const assignments = readAssignments();
-  assignments[orderId] = transporter;
-  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments));
-  window.dispatchEvent(new CustomEvent("smartlogix-transporter-assigned", { detail: { orderId, transporter } }));
-}
-
-function getAssignment(orderId: string): string | null {
-  return readAssignments()[orderId] ?? null;
-}
-
 export function OrdersPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("all");
-  const [customerId, setCustomerId] = useState("1");
-  const [sku, setSku] = useState("100001");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [sku, setSku] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [transporter, setTransporter] = useState(TRANSPORTERS[0]?.username ?? "");
   const [creating, setCreating] = useState(false);
@@ -53,29 +36,77 @@ export function OrdersPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [bulkFeedback, setBulkFeedback] = useState<string | null>(null);
-  const [assignments, setAssignments] = useState<Record<string, string>>(() => readAssignments());
+  const [assigningOrder, setAssigningOrder] = useState<string | null>(null);
   const { can, role } = usePermissions();
   const { session } = useAuth();
   const canCreate = can("orders.create");
   const canReview = can("orders.review");
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { data: orders, loading, refresh } = useApiQuery<ApiOrder[], Order[]>({
-    path: "/api/orders", fallbackData: fallbackOrders, transform: (r) => r.map(adaptOrder)
+  const { data: customers, loading: cLoading } = useApiQuery<ApiCustomer[], Customer[]>({
+    path: "/api/customers", transform: (r) => r.map(adaptCustomer)
   });
 
-  useAutoRefresh(() => { if (!loading) refresh(); }, 10000);
+  const { data: products } = useApiQuery<ApiInventory[], Product[]>({
+    path: "/api/inventory", transform: (r) => r.map(adaptInventory)
+  });
+
+  const { data: orders, loading, refresh } = useApiQuery<ApiOrder[], Order[]>({
+    path: "/api/orders",
+    transform: (r) => {
+      const customerMap = new Map<string, string>();
+      (customers ?? []).forEach((c) => customerMap.set(c.id, c.name));
+      return r.map((o) => adaptOrder(o, customerMap.get(String(o.customerId))));
+    }
+  });
+
+  useAutoRefresh(() => { if (!loading && !cLoading) refresh(); }, 10000);
 
   const { operationalOrders, validationQueue, validateOrder } = useOperationalWorkspace({ orders });
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCustomers = useMemo(() => {
+    if (!customers) return [];
+    if (!customerSearch) return customers.slice(0, 8);
+    const q = customerSearch.toLowerCase();
+    return customers.filter((c) => `${c.name} ${c.phone ?? ""} ${c.email ?? ""}`.toLowerCase().includes(q)).slice(0, 8);
+  }, [customers, customerSearch]);
+
+  async function handleValidate(order: Order, decision: OrderDecisionType, detail: string) {
+    await validateOrder(order, decision);
+    addHistoryEntry({ orderId: order.id, action: decision, actor: session?.name ?? "Admin", actorRole: role ?? "owner", detail });
+    refresh();
+  }
+
+  async function handleAssign(orderId: string, transporterUsername: string) {
+    setAssigningOrder(orderId);
+    try {
+      await apiFetch(`/api/orders/${orderId}/assign?transporter=${encodeURIComponent(transporterUsername)}`, { method: "PUT" });
+      refresh();
+    } catch {
+    } finally {
+      setAssigningOrder(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     let list = operationalOrders;
     if (tab !== "all") list = list.filter((o) => o.stage === tab);
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter((o) => `${o.id} ${o.customer} ${o.sku} ${assignments[o.id] ?? ""}`.toLowerCase().includes(q));
+      list = list.filter((o) => `${o.id} ${o.customer} ${o.sku} ${o.assignedTo ?? ""}`.toLowerCase().includes(q));
     }
     return list;
-  }, [operationalOrders, tab, query, assignments]);
+  }, [operationalOrders, tab, query]);
 
   const counts = useMemo(() => ({
     total: operationalOrders.length,
@@ -88,47 +119,54 @@ export function OrdersPage() {
     e.preventDefault();
     setCreating(true);
     setFeedback(null);
+    if (!selectedCustomer) {
+      setFeedback({ type: "error", msg: "Selecciona un cliente" });
+      setCreating(false);
+      return;
+    }
+    const duplicate = (operationalOrders ?? []).find(
+      (o) => o.customerId === String(selectedCustomer.id) && o.sku === sku.trim() && (o.stage === "new" || o.stage === "confirmed")
+    );
+    if (duplicate) {
+      setFeedback({ type: "error", msg: `Ya existe un pedido activo para ${selectedCustomer.name} con SKU ${sku.trim()} (Pedido #${duplicate.id})` });
+      setCreating(false);
+      return;
+    }
     try {
       const res = await apiFetch<ApiCreateOrderResponse>("/api/orders", {
         method: "POST",
-        body: JSON.stringify({ customerId: Number(customerId), sku: Number(sku), quantity: Number(quantity) } as ApiCreateOrderRequest)
+        body: JSON.stringify({ customerId: Number(selectedCustomer.id), sku: sku.trim(), quantity: Number(quantity) } as ApiCreateOrderRequest)
       });
       if (transporter) {
-        saveAssignment(String(res.orderId), transporter);
-        setAssignments(readAssignments());
+        await apiFetch(`/api/orders/${res.orderId}/assign?transporter=${encodeURIComponent(transporter)}`, { method: "PUT" });
       }
       addHistoryEntry({
         orderId: String(res.orderId),
         action: "created",
         actor: session?.name ?? "Admin",
         actorRole: role ?? "owner",
-        detail: `Pedido #${res.orderId} creado - Cliente ${customerId}, SKU ${sku}, ${quantity} unids` + (transporter ? ` - Asignado a ${TRANSPORTERS.find(t => t.username === transporter)?.name}` : ""),
+        detail: `Pedido #${res.orderId} creado - ${selectedCustomer.name}, SKU ${sku}, ${quantity} unids` + (transporter ? ` - Asignado a ${TRANSPORTERS.find(t => t.username === transporter)?.name}` : ""),
       });
-      setFeedback({ type: "success", msg: `Pedido #${res.orderId} creado y asignado a transportista` });
+      setSelectedCustomer(null);
+      setCustomerSearch("");
       setQuantity("1");
-      setShowForm(false);
       refresh();
+      if (confirm("Pedido creado exitosamente. ¿Desea crear otro pedido?")) {
+        setFeedback(null);
+      } else {
+        setShowForm(false);
+        setFeedback({ type: "success", msg: `Pedido #${res.orderId} creado` });
+      }
     } catch (err) {
       setFeedback({ type: "error", msg: err instanceof ApiRequestError ? err.message : "Error al crear pedido" });
     } finally { setCreating(false); }
   }
 
-  useEffect(() => {
-    const handler = () => setAssignments(readAssignments());
-    window.addEventListener("smartlogix-transporter-assigned", handler);
-    return () => window.removeEventListener("smartlogix-transporter-assigned", handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setAssignments(readAssignments());
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
-
-  const getTransporterName = (orderId: string) => {
-    const username = assignments[orderId];
-    if (!username) return null;
-    return TRANSPORTERS.find((t) => t.username === username)?.name ?? username;
+  const getTransporterName = (order: Order) => {
+    if (order.assignedTo) {
+      return TRANSPORTERS.find((t) => t.username === order.assignedTo)?.name ?? order.assignedTo;
+    }
+    return null;
   };
 
   const badgeColor = (stage: string) =>
@@ -158,7 +196,7 @@ export function OrdersPage() {
               </button>
             </>
           )}
-          <button onClick={() => exportOrdersCSV(operationalOrders.map(o => ({ id: o.id, customer: o.customer, sku: o.sku, quantity: o.quantity, stage: String(o.stage), createdAt: o.createdAt, transporter: getTransporterName(o.id) ?? undefined })))} className="btn-touch-outline min-h-[40px] gap-1">
+          <button onClick={() => exportOrdersCSV(operationalOrders.map(o => ({ id: o.id, customer: o.customer, sku: o.sku, quantity: o.quantity, stage: String(o.stage), createdAt: o.createdAt, transporter: getTransporterName(o) ?? undefined })))} className="btn-touch-outline min-h-[40px] gap-1">
             <Download className="h-4 w-4" />
           </button>
         </div>
@@ -167,13 +205,52 @@ export function OrdersPage() {
       {showForm && (
         <div className="rounded border border-border bg-card p-4">
           <form onSubmit={handleCreate} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1 min-w-0">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-muted-foreground mb-1">Cliente ID</label>
-              <input value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="h-9 w-full rounded border border-input bg-[#F8FBFD] px-3 text-sm" placeholder="1" />
+            <div className="flex-1 min-w-0 relative" ref={dropdownRef}>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-muted-foreground mb-1">Cliente</label>
+              <div className="relative">
+                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  value={selectedCustomer ? selectedCustomer.name : customerSearch}
+                  onChange={(e) => { setCustomerSearch(e.target.value); setSelectedCustomer(null); }}
+                  onFocus={() => setShowCustomerDropdown(true)}
+                  placeholder="Buscar cliente..."
+                  className="h-9 w-full rounded border border-input bg-[#F8FBFD] pl-8 pr-3 text-sm"
+                />
+              </div>
+              {showCustomerDropdown && !selectedCustomer && (
+                <div className="absolute z-50 mt-1 w-full rounded border border-border bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {filteredCustomers.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</p>
+                  )}
+                  {filteredCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                    >
+                      <User className="h-3.5 w-3.5 text-[#4B98CF] shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{c.name}</p>
+                        {c.phone && <p className="text-[10px] text-muted-foreground">{c.phone}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-muted-foreground mb-1">SKU</label>
-              <input value={sku} onChange={(e) => setSku(e.target.value)} className="h-9 w-full rounded border border-input bg-[#F8FBFD] px-3 text-sm" placeholder="100001" />
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-muted-foreground mb-1">Producto</label>
+              <select
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                className="h-9 w-full rounded border border-input bg-[#F8FBFD] px-2 text-sm"
+              >
+                <option value="" disabled>Seleccionar...</option>
+                {(products ?? []).filter((p) => p.stock > 0).map((p) => (
+                  <option key={p.sku} value={p.sku}>{p.name} ({p.stock} unids)</option>
+                ))}
+              </select>
             </div>
             <div className="w-20 sm:w-20">
               <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-muted-foreground mb-1">Cant</label>
@@ -207,7 +284,7 @@ export function OrdersPage() {
           <textarea
             value={csvText}
             onChange={(e) => setCsvText(e.target.value)}
-            placeholder={"1,100001,3\n2,100002,1\n1,100003,5"}
+            placeholder={"1,COCA-COLA-2L,3\n2,SPRITE-2L,1"}
             rows={5}
             className="w-full rounded border border-input bg-[#F8FBFD] p-3 text-sm font-mono"
           />
@@ -222,7 +299,7 @@ export function OrdersPage() {
                   try {
                     await apiFetch<ApiCreateOrderResponse>("/api/orders", {
                       method: "POST",
-                      body: JSON.stringify({ customerId: Number(cId), sku: Number(s), quantity: Number(q) })
+                      body: JSON.stringify({ customerId: Number(cId), sku: s, quantity: Number(q) } as ApiCreateOrderRequest)
                     });
                     success++;
                   } catch { errors.push("Fallo: " + line); }
@@ -272,11 +349,11 @@ export function OrdersPage() {
             </thead>
           <tbody>
             {filtered.map((order) => {
-              const tName = getTransporterName(order.id);
+              const tName = getTransporterName(order);
               return (
                 <tr key={order.id} className="border-b border-[#F5F7F9] hover:bg-muted cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
                   <td className="px-4 py-3 font-bold text-[#4B98CF]">#{order.id}</td>
-                  <td className="px-4 py-3 text-foreground">{order.customer}</td>
+                  <td className="px-4 py-3 text-foreground font-medium">{order.customer}</td>
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{order.sku}</td>
                   <td className="px-4 py-3 hidden sm:table-cell">x{order.quantity}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
@@ -286,7 +363,18 @@ export function OrdersPage() {
                         {tName}
                       </span>
                     ) : (
-                      <span className="text-xs text-[#DCE0E2]">Sin asignar</span>
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        value=""
+                        onChange={(e) => { if (e.target.value) handleAssign(order.id, e.target.value); }}
+                        disabled={assigningOrder === order.id}
+                        className="text-xs rounded border border-border bg-transparent px-1.5 py-0.5"
+                      >
+                        <option value="" disabled>Asignar...</option>
+                        {TRANSPORTERS.map((t) => (
+                          <option key={t.username} value={t.username}>{t.name}</option>
+                        ))}
+                      </select>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -300,9 +388,9 @@ export function OrdersPage() {
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                    {canReview && order.stage !== "delivered" && (
                      <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                       <button onClick={() => { validateOrder(order, "approved"); addHistoryEntry({ orderId: order.id, action: "approved", actor: session?.name ?? "Admin", actorRole: role ?? "owner", detail: "Pedido aprobado - listo para despacho" }); }} title="Aprobar" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-green-600 hover:bg-green-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Check className="h-4 w-4 sm:h-5 sm:w-5" /></button>
-                       <button onClick={() => { validateOrder(order, "reprocess"); addHistoryEntry({ orderId: order.id, action: "reprocessed", actor: session?.name ?? "Admin", actorRole: role ?? "owner", detail: "Pedido enviado a reproceso" }); }} title="Reprocesar" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-[#E3AA75] hover:bg-amber-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RotateCw className="h-4 w-4 sm:h-5 sm:w-5" /></button>
-                       <button onClick={() => { validateOrder(order, "rejected"); addHistoryEntry({ orderId: order.id, action: "rejected", actor: session?.name ?? "Admin", actorRole: role ?? "owner", detail: "Pedido rechazado - incidencia operativa" }); }} title="Rechazar" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+                       <button onClick={() => handleValidate(order, "approved", "Pedido aprobado - listo para despacho")} title="Aprobar" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-green-600 hover:bg-green-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Check className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+                       <button onClick={() => handleValidate(order, "reprocess", "Pedido enviado a reproceso")} title="Reprocesar" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-[#E3AA75] hover:bg-amber-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RotateCw className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+                       <button onClick={() => handleValidate(order, "rejected", "Pedido rechazado - incidencia operativa")} title="Rechazar" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
                        </div>
                      )}
                   </td>

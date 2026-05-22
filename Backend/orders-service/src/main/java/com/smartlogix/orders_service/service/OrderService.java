@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -59,8 +60,21 @@ public class OrderService {
         });
     }
 
+    @Transactional
+    public void assignOrder(Long orderId, String transporter) {
+        log.info("Asignando transportista {} a la orden {}", transporter, orderId);
+        orderRepository.findById(orderId).ifPresent(order -> {
+            order.setAssignedTo(transporter);
+            orderRepository.save(order);
+        });
+    }
+
     public List<Order> getAllOrders() {
         log.info("Recuperando todas las ordenes de la base de datos");
         return orderRepository.findAll();
+    }
+
+    public Optional<Order> getOrderById(Long id) {
+        return orderRepository.findById(id);
     }
 }

@@ -1,95 +1,107 @@
-import type { AlertItem, HealthState, Order, OrderStage, Product, Role, Shipment, ShipmentStage } from "@/types/domain";
+import type { AlertItem, HealthState, Order, OrderStage, PaymentMethod, Product, Role, Sale, SaleItem, Shipment, ShipmentStage } from "@/types/domain";
 
 export const products: Product[] = [
+  { id: "p1", sku: "COCA-COLA-2L", name: "Coca-Cola 2L", stock: 48, price: 2500, cost: 1500, category: "bebidas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p2", sku: "SPRITE-2L", name: "Sprite 2L", stock: 36, price: 2200, cost: 1300, category: "bebidas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p3", sku: "PEPSI-2L", name: "Pepsi 2L", stock: 72, price: 2300, cost: 1400, category: "bebidas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p4", sku: "AGUA-MINERAL-500", name: "Agua Mineral 500ml", stock: 60, price: 800, cost: 400, category: "bebidas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p5", sku: "JUGO-WATTS-1L", name: "Jugo Watt's 1L", stock: 30, price: 1500, cost: 900, category: "bebidas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p6", sku: "CERVEZA-CORONA-355", name: "Cerveza Corona 355ml", stock: 90, price: 1800, cost: 1000, category: "bebidas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p7", sku: "GALLETAS-MCKAY", name: "Galletas McKay", stock: 40, price: 1000, cost: 600, category: "galletas", status: "healthy", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p8", sku: "CHOCOLATE-TRENCITO", name: "Chocolate Trencito", stock: 3, price: 1200, cost: 700, category: "dulces", status: "warning", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p9", sku: "CHICLES-FRUGELE", name: "Chicles Frugelé", stock: 2, price: 500, cost: 250, category: "dulces", status: "critical", updatedAt: "2026-05-18T09:00:00-04:00" },
+  { id: "p10", sku: "PAPAS-LAYS-200G", name: "Papas Lays 200g", stock: 8, price: 1600, cost: 900, category: "otros", status: "warning", updatedAt: "2026-05-18T09:00:00-04:00" },
+];
+
+const today = "2026-05-20";
+
+export const demoDayStart = `${today}T00:00:00-04:00`;
+
+export const sales: Sale[] = [
   {
-    id: "inv-1",
-    sku: "COCA-COLA-2L",
-    name: "Coca-Cola 2L",
-    stock: 48,
-    status: "healthy",
-    coverageDays: 14,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-1",
+    items: [
+      { sku: "COCA-COLA-2L", name: "Coca-Cola 2L", quantity: 2, unitPrice: 2500, subtotal: 5000 },
+      { sku: "GALLETAS-MCKAY", name: "Galletas McKay", quantity: 3, unitPrice: 1000, subtotal: 3000 },
+    ],
+    total: 8000,
+    paymentMethod: "cash",
+    vendorId: "maria@smartlogix.cl",
+    vendorName: "Maria Gonzalez",
+    createdAt: `${today}T09:15:00-04:00`
   },
   {
-    id: "inv-2",
-    sku: "PEPSI-2L",
-    name: "Pepsi 2L",
-    stock: 72,
-    status: "healthy",
-    coverageDays: 20,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-2",
+    items: [
+      { sku: "SPRITE-2L", name: "Sprite 2L", quantity: 1, unitPrice: 2200, subtotal: 2200 },
+      { sku: "CHOCOLATE-TRENCITO", name: "Chocolate Trencito", quantity: 2, unitPrice: 1200, subtotal: 2400 },
+    ],
+    total: 4600,
+    paymentMethod: "cash",
+    vendorId: "carlos@smartlogix.cl",
+    vendorName: "Carlos Muñoz",
+    createdAt: `${today}T09:30:00-04:00`
   },
   {
-    id: "inv-3",
-    sku: "SPRITE-2L",
-    name: "Sprite 2L",
-    stock: 65,
-    status: "healthy",
-    coverageDays: 18,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-3",
+    items: [
+      { sku: "COCA-COLA-2L", name: "Coca-Cola 2L", quantity: 3, unitPrice: 2500, subtotal: 7500 },
+      { sku: "PAPAS-LAYS-200G", name: "Papas Lays 200g", quantity: 1, unitPrice: 1600, subtotal: 1600 },
+    ],
+    total: 9100,
+    paymentMethod: "transfer",
+    vendorId: "maria@smartlogix.cl",
+    vendorName: "Maria Gonzalez",
+    createdAt: `${today}T10:05:00-04:00`
   },
   {
-    id: "inv-4",
-    sku: "AGUA-MINERAL-500",
-    name: "Agua Mineral 500ml",
-    stock: 120,
-    status: "healthy",
-    coverageDays: 30,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-4",
+    items: [
+      { sku: "AGUA-MINERAL-500", name: "Agua Mineral 500ml", quantity: 2, unitPrice: 800, subtotal: 1600 },
+      { sku: "GALLETAS-MCKAY", name: "Galletas McKay", quantity: 1, unitPrice: 1000, subtotal: 1000 },
+    ],
+    total: 2600,
+    paymentMethod: "cash",
+    vendorId: "carlos@smartlogix.cl",
+    vendorName: "Carlos Muñoz",
+    createdAt: `${today}T10:45:00-04:00`
   },
   {
-    id: "inv-5",
-    sku: "JUGO-WATTS-1L",
-    name: "Jugo Watt's 1L",
-    stock: 35,
-    status: "healthy",
-    coverageDays: 10,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-5",
+    items: [
+      { sku: "PEPSI-2L", name: "Pepsi 2L", quantity: 2, unitPrice: 2300, subtotal: 4600 },
+      { sku: "CHICLES-FRUGELE", name: "Chicles Frugelé", quantity: 1, unitPrice: 500, subtotal: 500 },
+      { sku: "JUGO-WATTS-1L", name: "Jugo Watt's 1L", quantity: 1, unitPrice: 1500, subtotal: 1500 },
+    ],
+    total: 6600,
+    paymentMethod: "cash",
+    vendorId: "maria@smartlogix.cl",
+    vendorName: "Maria Gonzalez",
+    createdAt: `${today}T11:20:00-04:00`
   },
   {
-    id: "inv-6",
-    sku: "CERVEZA-CORONA-355",
-    name: "Cerveza Corona 355ml",
-    stock: 90,
-    status: "healthy",
-    coverageDays: 25,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-6",
+    items: [
+      { sku: "CERVEZA-CORONA-355", name: "Cerveza Corona 355ml", quantity: 4, unitPrice: 1800, subtotal: 7200 },
+    ],
+    total: 7200,
+    paymentMethod: "transfer",
+    vendorId: "carlos@smartlogix.cl",
+    vendorName: "Carlos Muñoz",
+    createdAt: `${today}T12:00:00-04:00`
   },
   {
-    id: "inv-7",
-    sku: "CHOCOLATE-TRENCITO",
-    name: "Chocolate Trencito",
-    stock: 3,
-    status: "warning",
-    coverageDays: 3,
-    updatedAt: "2026-05-18T09:00:00-04:00"
-  },
-  {
-    id: "inv-8",
-    sku: "GALLETAS-MCKAY",
-    name: "Galletas McKay",
-    stock: 15,
-    status: "warning",
-    coverageDays: 5,
-    updatedAt: "2026-05-18T09:00:00-04:00"
-  },
-  {
-    id: "inv-9",
-    sku: "PAPAS-LAYS-200G",
-    name: "Papas Lays 200g",
-    stock: 8,
-    status: "warning",
-    coverageDays: 4,
-    updatedAt: "2026-05-18T09:00:00-04:00"
-  },
-  {
-    id: "inv-10",
-    sku: "CHICLES-FRUGELE",
-    name: "Chicles Frugelé",
-    stock: 2,
-    status: "critical",
-    coverageDays: 0,
-    updatedAt: "2026-05-18T09:00:00-04:00"
+    id: "sale-7",
+    items: [
+      { sku: "COCA-COLA-2L", name: "Coca-Cola 2L", quantity: 1, unitPrice: 2500, subtotal: 2500 },
+      { sku: "SPRITE-2L", name: "Sprite 2L", quantity: 1, unitPrice: 2200, subtotal: 2200 },
+      { sku: "GALLETAS-MCKAY", name: "Galletas McKay", quantity: 2, unitPrice: 1000, subtotal: 2000 },
+    ],
+    total: 6700,
+    paymentMethod: "cash",
+    vendorId: "maria@smartlogix.cl",
+    vendorName: "Maria Gonzalez",
+    createdAt: `${today}T12:30:00-04:00`
   }
 ];
 

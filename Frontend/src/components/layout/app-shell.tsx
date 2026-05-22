@@ -5,14 +5,12 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { getVisibleNavItems } from "@/components/layout/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
-import { useDarkMode } from "@/hooks/use-dark-mode";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 
 export function AppShell() {
   const { pathname } = useLocation();
   const { session, logout } = useAuth();
   const isOnline = useOnlineStatus();
-  const { dark, toggle: toggleDark } = useDarkMode();
   const [open, setOpen] = useState(false);
   const visibleItems = useMemo(() => (session ? getVisibleNavItems(session.role) : []), [session]);
 
@@ -64,10 +62,10 @@ export function AppShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar title={currentTitle} onMenu={() => setOpen(true)} onLogout={logout} role={session.role} sessionName={session.name} sessionUsername={session.username} dark={dark} onToggleDark={toggleDark} />
+        <Topbar title={currentTitle} onMenu={() => setOpen(true)} onLogout={logout} role={session.role} sessionName={session.name} sessionUsername={session.username} />
 
         {!isOnline && (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-700">
             Sin conexion a internet. Mostrando datos locales.
           </div>
         )}

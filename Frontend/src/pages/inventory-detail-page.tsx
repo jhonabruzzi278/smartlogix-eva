@@ -1,7 +1,6 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Box, Package, ShoppingBag, TrendingDown, TrendingUp } from "lucide-react";
-import { products as fallbackProducts, orders as fallbackOrders } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { adaptInventory, adaptOrder } from "@/lib/api-adapters";
@@ -12,13 +11,12 @@ import type { Order, Product } from "@/types/domain";
 export function InventoryDetailPage() {
   const { productId } = useParams();
   const decodedId = decodeURIComponent(productId ?? "");
-  const fallbackProduct = fallbackProducts.find((item) => item.id === decodedId || item.sku === decodedId) ?? null;
 
   const { data: product } = useApiQuery<ApiInventory, Product | null>({
-    path: `/api/inventory/${encodeURIComponent(decodedId)}`, fallbackData: fallbackProduct, transform: adaptInventory, enabled: Boolean(decodedId)
+    path: `/api/inventory/${encodeURIComponent(decodedId)}`, transform: adaptInventory, enabled: Boolean(decodedId)
   });
   const { data: orders } = useApiQuery<ApiOrder[], Order[]>({
-    path: "/api/orders", fallbackData: fallbackOrders, transform: (r) => r.map(adaptOrder)
+    path: "/api/orders", transform: (r) => r.map(adaptOrder)
   });
 
   const { operationalInventory, operationalOrders } = useOperationalWorkspace({ inventory: product ? [product] : [], orders });
@@ -29,7 +27,7 @@ export function InventoryDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <Box className="h-12 w-12 text-[#DCE0E2]" />
-        <p className="mt-4 font-medium text-[#939FAD]">Producto no encontrado</p>
+        <p className="mt-4 font-medium text-[#6B7280]">Producto no encontrado</p>
         <Link to="/inventory" className="mt-2 text-sm text-[#4B98CF] hover:underline">Volver a inventario</Link>
       </div>
     );
@@ -43,16 +41,16 @@ export function InventoryDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Link to="/inventory" className="inline-flex items-center gap-1 text-xs text-[#939FAD] hover:text-[#112b4a]">
+      <Link to="/inventory" className="inline-flex items-center gap-1 text-xs text-[#6B7280] hover:text-[#112b4a]">
         <ArrowLeft className="h-3.5 w-3.5" /> Inventario
       </Link>
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#939FAD]">Producto</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Producto</p>
           <h1 className="text-xl font-bold text-[#112b4a]">SKU {resolvedProduct.sku}</h1>
-          <p className="text-sm text-[#939FAD]">{resolvedProduct.name}</p>
+          <p className="text-sm text-[#6B7280]">{resolvedProduct.name}</p>
         </div>
         <span className={cn(
           "self-start rounded-full px-3 py-1 text-xs font-bold",
@@ -67,11 +65,11 @@ export function InventoryDetailPage() {
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Stock gauge */}
         <div className="rounded border border-[#DCE0E2] bg-white p-5">
-          <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Nivel de stock</p>
+          <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Nivel de stock</p>
 
           <div className="flex items-end gap-2 mb-2">
             <span className="text-4xl font-bold text-[#112b4a]">{resolvedProduct.stock}</span>
-            <span className="text-sm text-[#939FAD] pb-1">unidades</span>
+            <span className="text-sm text-[#6B7280] pb-1">unidades</span>
             {delta !== 0 && (
               <span className={cn("flex items-center gap-0.5 text-xs font-bold pb-1", delta > 0 ? "text-[#4EB4A5]" : "text-red-500")}>
                 {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
@@ -88,7 +86,7 @@ export function InventoryDetailPage() {
             />
           </div>
 
-          <div className="flex justify-between mt-2 text-[10px] text-[#939FAD]">
+          <div className="flex justify-between mt-2 text-[10px] text-[#6B7280]">
             <span>0</span>
             <span>50</span>
             <span>100</span>
@@ -96,11 +94,7 @@ export function InventoryDetailPage() {
 
           <div className="grid grid-cols-2 gap-3 mt-5">
             <div className="rounded bg-[#F8FAFB] px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Cobertura</p>
-              <p className="text-lg font-bold text-[#112b4a]">{resolvedProduct.coverageDays} dias</p>
-            </div>
-            <div className="rounded bg-[#F8FAFB] px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Actualizado</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Actualizado</p>
               <p className="text-sm font-bold text-[#112b4a]">{new Date(resolvedProduct.updatedAt).toLocaleDateString("es-CL")}</p>
             </div>
           </div>
@@ -109,14 +103,14 @@ export function InventoryDetailPage() {
             <div className="mt-3 rounded border border-[#4B98CF]/20 bg-[#4B98CF]/5 px-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#4B98CF]">Ultimo ajuste</p>
               <p className="mt-1 text-sm text-[#112b4a]">{reason}</p>
-              {adjustedAt && <p className="mt-0.5 text-[10px] text-[#939FAD]">{new Date(adjustedAt).toLocaleString("es-CL")}</p>}
+              {adjustedAt && <p className="mt-0.5 text-[10px] text-[#6B7280]">{new Date(adjustedAt).toLocaleString("es-CL")}</p>}
             </div>
           )}
         </div>
 
         {/* Related orders */}
         <div className="rounded border border-[#DCE0E2] bg-white p-5">
-          <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Pedidos con este SKU ({relatedOrders.length})</p>
+          <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Pedidos con este SKU ({relatedOrders.length})</p>
 
           {relatedOrders.length > 0 ? (
             <div className="space-y-2">
@@ -127,10 +121,10 @@ export function InventoryDetailPage() {
                   className="flex items-center justify-between rounded bg-[#F8FAFB] px-4 py-3 hover:bg-[#ECEEF0] transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <ShoppingBag className="h-4 w-4 text-[#939FAD]" />
+                    <ShoppingBag className="h-4 w-4 text-[#6B7280]" />
                     <div>
                       <p className="text-sm font-semibold text-[#112b4a]">Pedido #{order.id}</p>
-                      <p className="text-xs text-[#939FAD]">Cliente {order.customer} &middot; {order.quantity} unids</p>
+                      <p className="text-xs text-[#6B7280]">Cliente {order.customer} &middot; {order.quantity} unids</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -142,7 +136,7 @@ export function InventoryDetailPage() {
                     )}>
                       {order.stage === "new" ? "Nuevo" : order.stage === "confirmed" ? "Confirmado" : order.stage}
                     </span>
-                    <p className="mt-0.5 text-[10px] text-[#939FAD]">{new Date(order.createdAt).toLocaleDateString("es-CL")}</p>
+                    <p className="mt-0.5 text-[10px] text-[#6B7280]">{new Date(order.createdAt).toLocaleDateString("es-CL")}</p>
                   </div>
                 </Link>
               ))}
@@ -150,7 +144,7 @@ export function InventoryDetailPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8">
               <Package className="h-8 w-8 text-[#ECEEF0]" />
-              <p className="mt-2 text-xs text-[#939FAD]">Sin pedidos asociados</p>
+              <p className="mt-2 text-xs text-[#6B7280]">Sin pedidos asociados</p>
             </div>
           )}
         </div>

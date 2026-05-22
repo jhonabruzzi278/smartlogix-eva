@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
+﻿import { useEffect, useState, useMemo } from "react";
 import { Clock, FileText, Inbox, Package, Search, Truck, User, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { managedUsers } from "@/app/user-directory";
 import { Input } from "@/components/ui/input";
-import { orders as fallbackOrders, shipments as fallbackShipments } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { cn } from "@/lib/utils";
@@ -41,13 +40,11 @@ export function NotificationsPage() {
 
   const { data: orders } = useApiQuery<ApiOrder[], Order[]>({
     path: "/api/orders",
-    fallbackData: fallbackOrders,
     transform: (response) => response.map(adaptOrder)
   });
 
   const { data: shipments } = useApiQuery<ApiShipment[], Shipment[]>({
     path: "/api/shipments",
-    fallbackData: fallbackShipments,
     transform: (response) => response.map(adaptShipment)
   });
 
@@ -110,7 +107,7 @@ export function NotificationsPage() {
         id: "sys-3",
         type: "system",
         icon: FileText,
-        iconBg: "bg-[#939FAD]",
+        iconBg: "bg-[#6B7280]",
         title: "Backup completado",
         detail: "Respaldo diario de base de datos completado exitosamente.",
         link: "/dashboard",
@@ -120,23 +117,20 @@ export function NotificationsPage() {
     );
 
     // Transporter assignment notifications
-    try {
-      const assignments = JSON.parse(localStorage.getItem("smartlogix-order-transporter-assignments") ?? "{}");
-      Object.entries(assignments).forEach(([orderId, username]) => {
-        const t = managedUsers.find((u) => u.username === username);
-        items.push({
-          id: `asgn-${orderId}`,
-          type: "order",
-          icon: Truck,
-          iconBg: "bg-[#4EB4A5]",
-          title: `Pedido #${orderId} asignado`,
-          detail: `Transportista ${t?.name ?? username} asignado al pedido.`,
-          link: `/orders/${orderId}`,
-          time: new Date(Date.now() - 120000).toISOString(),
-          read: true
-        });
+    (orders ?? []).filter((o) => o.assignedTo).forEach((order) => {
+      const t = managedUsers.find((u) => u.username === order.assignedTo);
+      items.push({
+        id: `asgn-${order.id}`,
+        type: "order",
+        icon: Truck,
+        iconBg: "bg-[#4EB4A5]",
+        title: `Pedido #${order.id} asignado`,
+        detail: `Transportista ${t?.name ?? order.assignedTo} asignado al pedido.`,
+        link: `/orders/${order.id}`,
+        time: new Date(Date.now() - 120000).toISOString(),
+        read: true
       });
-    } catch {}
+    });
 
     return items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
   }, [orders, shipments]);
@@ -189,7 +183,7 @@ export function NotificationsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#112b4a]">Notificaciones</h1>
-          <p className="mt-0.5 text-sm text-[#939FAD]">
+          <p className="mt-0.5 text-sm text-[#6B7280]">
             {unreadCount} sin leer de {filtered.length} notificaciones
           </p>
         </div>
@@ -222,7 +216,7 @@ export function NotificationsPage() {
                   "rounded px-3 py-1.5 text-xs font-semibold transition-colors",
                   filter === f.value
                     ? "bg-[#4B98CF] text-white"
-                    : "text-[#939FAD] hover:text-[#112b4a]"
+                    : "text-[#6B7280] hover:text-[#112b4a]"
                 )}
               >
                 {f.label}
@@ -236,7 +230,7 @@ export function NotificationsPage() {
               "rounded border px-3 py-1.5 text-xs font-semibold transition-colors",
               criticalOnly
                 ? "border-red-300 bg-red-50 text-red-600"
-                : "border-[#DCE0E2] bg-white text-[#939FAD] hover:text-red-500"
+                : "border-[#DCE0E2] bg-white text-[#6B7280] hover:text-red-500"
             )}
           >
             Solo criticas
@@ -244,7 +238,7 @@ export function NotificationsPage() {
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#939FAD]" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -276,14 +270,14 @@ export function NotificationsPage() {
                   <p className={cn("text-sm", !readIds.has(n.id) && !n.read ? "font-bold text-[#112b4a]" : "text-[#112b4a]")}>
                     {n.title}
                   </p>
-                  <span className="shrink-0 text-xs text-[#939FAD]">{formatTime(n.time)}</span>
+                  <span className="shrink-0 text-xs text-[#6B7280]">{formatTime(n.time)}</span>
                 </div>
-                <p className="mt-0.5 text-xs text-[#939FAD]">{n.detail}</p>
+                <p className="mt-0.5 text-xs text-[#6B7280]">{n.detail}</p>
               </div>
 
               <button
                 onClick={(e) => { e.preventDefault(); clearOne(n.id); }}
-                className="shrink-0 self-center rounded p-1 text-[#939FAD] hover:bg-[#ECEEF0] hover:text-red-500"
+                className="shrink-0 self-center rounded p-1 text-[#6B7280] hover:bg-[#ECEEF0] hover:text-red-500"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -292,8 +286,8 @@ export function NotificationsPage() {
         ) : (
           <div className="flex flex-col items-center justify-center rounded border border-[#DCE0E2] bg-white py-16">
             <Inbox className="h-10 w-10 text-[#DCE0E2]" />
-            <p className="mt-3 text-sm font-medium text-[#939FAD]">Sin notificaciones</p>
-            <p className="mt-1 text-xs text-[#939FAD]/70">No hay notificaciones que coincidan con el filtro actual.</p>
+            <p className="mt-3 text-sm font-medium text-[#6B7280]">Sin notificaciones</p>
+            <p className="mt-1 text-xs text-[#6B7280]/70">No hay notificaciones que coincidan con el filtro actual.</p>
           </div>
         )}
       </div>

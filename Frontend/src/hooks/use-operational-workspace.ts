@@ -1,45 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Order, Product, Shipment, ShipmentStage } from "@/types/domain";
-import { calculateCoverageDays, calculateHealthFromStock } from "@/lib/api-adapters";
-
-const STORAGE_KEY = "smartlogix-operational-workspace:v1";
-const STORAGE_EVENT = "smartlogix-operational-workspace:updated";
+import { useMemo } from "react";
+import type { Order, Product, ProductCategory, Sale, Shipment, ShipmentStage } from "@/types/domain";
+import { apiFetch } from "@/lib/api-client";
 
 export type OrderDecisionType = "approved" | "rejected" | "reprocess";
-
-interface StoredOrderDecision {
-  orderId: string;
-  decision: OrderDecisionType;
-  note: string;
-  updatedAt: string;
-}
-
-interface StoredInventoryAdjustment {
-  id: string;
-  sku: string;
-  delta: number;
-  reason: string;
-  updatedAt: string;
-}
-
-interface StoredShipmentUpdate {
-  shipmentId: string;
-  stage: ShipmentStage;
-  note: string;
-  updatedAt: string;
-}
-
-interface StoredManualShipment extends Shipment {
-  note: string;
-}
-
-interface OperationalStore {
-  version: 1;
-  orderDecisions: Record<string, StoredOrderDecision>;
-  inventoryAdjustments: StoredInventoryAdjustment[];
-  manualShipments: StoredManualShipment[];
-  shipmentUpdates: Record<string, StoredShipmentUpdate>;
-}
 
 export interface OperationalOrder extends Order {
   operationalDecision: OrderDecisionType | null;
@@ -53,6 +16,7 @@ export interface OperationalProduct extends Product {
   stockDelta: number;
   lastAdjustmentReason: string | null;
   lastAdjustmentAt: string | null;
+  isCustom: boolean;
 }
 
 export interface OperationalShipment extends Shipment {
@@ -70,81 +34,6 @@ export interface OperationalActivity {
   href: string;
 }
 
-function createEmptyStore(): OperationalStore {
-  return {
-    version: 1,
-    orderDecisions: {},
-    inventoryAdjustments: [],
-    manualShipments: [],
-    shipmentUpdates: {}
-  };
-}
-
-function readStore(): OperationalStore {
-  if (typeof window === "undefined") return createEmptyStore();
-
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return createEmptyStore();
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<OperationalStore>;
-    return {
-      version: 1,
-      orderDecisions: parsed.orderDecisions ?? {},
-      inventoryAdjustments: parsed.inventoryAdjustments ?? [],
-      manualShipments: parsed.manualShipments ?? [],
-      shipmentUpdates: parsed.shipmentUpdates ?? {}
-    };
-  } catch {
-    return createEmptyStore();
-  }
-}
-
-function persistStore(store: OperationalStore) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  window.dispatchEvent(new CustomEvent(STORAGE_EVENT));
-}
-
-function buildId(prefix: string) {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function mapDecisionToStage(decision: OrderDecisionType, currentStage: Order["stage"]): Order["stage"] {
-  if (decision === "approved") return "confirmed";
-  if (decision === "rejected") return "incident";
-  if (currentStage === "delivered") return currentStage;
-  return "new";
-}
-
-function createTracking(orderId: string) {
-  const suffix = Date.now().toString().slice(-6);
-  return `SLX-${orderId.padStart(4, "0")}-${suffix}`;
-}
-
-function applyShipmentUpdate(shipment: Shipment, update?: StoredShipmentUpdate | null): OperationalShipment {
-  if (!update) {
-    return {
-      ...shipment,
-      isManual: false,
-      operationalNote: null,
-      operationalUpdatedAt: null
-    };
-  }
-
-  return {
-    ...shipment,
-    stage: update.stage,
-    exception: update.stage === "delayed" ? update.note || shipment.exception : shipment.exception,
-    isManual: false,
-    operationalNote: update.note,
-    operationalUpdatedAt: update.updatedAt
-  };
-}
-
 export function useOperationalWorkspace({
   orders = [],
   inventory = [],
@@ -154,207 +43,150 @@ export function useOperationalWorkspace({
   inventory?: Product[];
   shipments?: Shipment[];
 }) {
-  const [store, setStore] = useState<OperationalStore>(() => readStore());
-
-  useEffect(() => {
-    const sync = () => setStore(readStore());
-    window.addEventListener("storage", sync);
-    window.addEventListener(STORAGE_EVENT, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(STORAGE_EVENT, sync as EventListener);
-    };
-  }, []);
-
-  function commit(next: OperationalStore) {
-    setStore(next);
-    persistStore(next);
-  }
+  const safeOrders = orders ?? [];
+  const safeInventory = inventory ?? [];
+  const safeShipments = shipments ?? [];
 
   const operationalInventory = useMemo<OperationalProduct[]>(() => {
-    return inventory.map((product) => {
-      const adjustments = store.inventoryAdjustments.filter((entry) => entry.sku === product.sku);
-      const stockDelta = adjustments.reduce((sum, entry) => sum + entry.delta, 0);
-      const sorted = adjustments.slice().sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      const latest = sorted[0] ?? null;
-      const stock = Math.max(product.stock + stockDelta, 0);
-
-      return {
-        ...product,
-        stock,
-        status: calculateHealthFromStock(stock),
-        coverageDays: calculateCoverageDays(stock),
-        updatedAt: latest?.updatedAt ?? product.updatedAt,
-        stockDelta,
-        lastAdjustmentReason: latest?.reason ?? null,
-        lastAdjustmentAt: latest?.updatedAt ?? null
-      };
-    });
-  }, [inventory, store.inventoryAdjustments]);
-
-  const mergedShipments = useMemo<OperationalShipment[]>(() => {
-    const base = shipments.map((shipment) => applyShipmentUpdate(shipment, store.shipmentUpdates[shipment.id] ?? null));
-    const manual = store.manualShipments.map((shipment) => {
-      const update = store.shipmentUpdates[shipment.id] ?? null;
-      const stage = update?.stage ?? shipment.stage;
-      return {
-        ...shipment,
-        stage,
-        exception: stage === "delayed" ? update?.note || shipment.note : shipment.exception,
-        isManual: true,
-        operationalNote: update?.note ?? shipment.note,
-        operationalUpdatedAt: update?.updatedAt ?? shipment.createdAt
-      } satisfies OperationalShipment;
-    });
-    return [...base, ...manual].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [shipments, store.manualShipments, store.shipmentUpdates]);
-
-  const shipmentOrderIds = useMemo(() => new Set(mergedShipments.map((s) => s.orderId)), [mergedShipments]);
+    return safeInventory.map((product) => ({
+      ...product,
+      stockDelta: 0,
+      lastAdjustmentReason: null,
+      lastAdjustmentAt: null,
+      isCustom: false,
+    }));
+  }, [safeInventory]);
 
   const operationalOrders = useMemo<OperationalOrder[]>(() => {
-    return orders
-      .map((order) => {
-        const decision = store.orderDecisions[order.id] ?? null;
-        const stage = decision ? mapDecisionToStage(decision.decision, order.stage) : order.stage;
-        return {
-          ...order,
-          stage,
-          operationalDecision: decision?.decision ?? null,
-          operationalNote: decision?.note ?? null,
-          operationalUpdatedAt: decision?.updatedAt ?? null,
-          needsReview: decision ? decision.decision !== "approved" && stage !== "delivered" : stage !== "delivered",
-          canDispatch: stage === "confirmed" && !shipmentOrderIds.has(order.id)
-        };
-      })
+    return safeOrders
+      .map((order) => ({
+        ...order,
+        operationalDecision: null,
+        operationalNote: null,
+        operationalUpdatedAt: null,
+        needsReview: order.stage !== "delivered",
+        canDispatch: order.stage === "confirmed",
+      }))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [orders, shipmentOrderIds, store.orderDecisions]);
+  }, [safeOrders]);
+
+  const operationalShipments = useMemo<OperationalShipment[]>(() => {
+    return safeShipments
+      .map((shipment) => ({
+        ...shipment,
+        isManual: false,
+        operationalNote: null,
+        operationalUpdatedAt: null,
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [safeShipments]);
 
   const validationQueue = useMemo(() => operationalOrders.filter((o) => o.needsReview), [operationalOrders]);
   const dispatchQueue = useMemo(() => operationalOrders.filter((o) => o.canDispatch), [operationalOrders]);
   const stockQueue = useMemo(() => operationalInventory.filter((p) => p.stock <= 5), [operationalInventory]);
 
   const activities = useMemo<OperationalActivity[]>(() => {
-    const orderActivities = Object.values(store.orderDecisions).map((entry) => ({
-      id: `order-${entry.orderId}`,
+    return safeOrders.slice(0, 4).map((o) => ({
+      id: `order-${o.id}`,
       type: "order" as const,
-      title: `Pedido ${entry.orderId}`,
-      detail: entry.note,
-      createdAt: entry.updatedAt,
-      href: `/orders/${entry.orderId}`
+      title: `Pedido ${o.id}`,
+      detail: o.stage,
+      createdAt: o.createdAt,
+      href: `/orders/${o.id}`,
     }));
+  }, [safeOrders]);
 
-    const inventoryActivities = store.inventoryAdjustments.map((entry) => ({
-      id: entry.id,
-      type: "inventory" as const,
-      title: `Stock ${entry.sku}`,
-      detail: `${entry.delta > 0 ? "+" : ""}${entry.delta} unidades | ${entry.reason}`,
-      createdAt: entry.updatedAt,
-      href: `/inventory/${encodeURIComponent(entry.sku)}`
-    }));
+  async function adjustInventory(product: Product, delta: number, _reason?: string) {
+    await apiFetch(`/api/inventory/${encodeURIComponent(product.sku)}/adjust?delta=${delta}`, {
+      method: "POST",
+    });
+  }
 
-    const shipmentActivities = [
-      ...store.manualShipments.map((entry) => ({
-        id: entry.id,
-        type: "shipment" as const,
-        title: `Despacho ${entry.orderId}`,
-        detail: `${entry.carrier} | tracking ${entry.tracking}`,
-        createdAt: entry.createdAt,
-        href: "/shipments"
-      })),
-      ...Object.values(store.shipmentUpdates).map((entry) => ({
-        id: `update-${entry.shipmentId}`,
-        type: "shipment" as const,
-        title: `Envio ${entry.shipmentId}`,
-        detail: entry.note,
-        createdAt: entry.updatedAt,
-        href: "/shipments"
-      }))
-    ];
+  async function addProduct(data: { sku: string; name: string; stock: number; price: number; cost: number; category: ProductCategory }) {
+    const response = await apiFetch("/api/inventory", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: data.sku.trim().toUpperCase().replace(/\s+/g, "-"),
+        name: data.name.trim(),
+        stock: data.stock,
+        price: data.price,
+        cost: data.cost,
+        category: data.category,
+      }),
+    });
+    return response;
+  }
 
-    return [...orderActivities, ...inventoryActivities, ...shipmentActivities]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 8);
-  }, [store.inventoryAdjustments, store.manualShipments, store.orderDecisions, store.shipmentUpdates]);
+  async function deleteProduct(sku: string) {
+    await apiFetch(`/api/inventory/${encodeURIComponent(sku)}`, {
+      method: "DELETE",
+    });
+  }
 
-  function validateOrder(order: Order, decision: OrderDecisionType, note?: string) {
-    const updatedAt = new Date().toISOString();
-    const next: OperationalStore = {
-      ...store,
-      orderDecisions: {
-        ...store.orderDecisions,
-        [order.id]: {
-          orderId: order.id,
-          decision,
-          note:
-            note?.trim() ||
-            (decision === "approved"
-              ? `Pedido aprobado por operaciones para ${order.customer}.`
-              : decision === "rejected"
-                ? `Pedido rechazado por revision operativa para ${order.customer}.`
-                : `Pedido enviado a reproceso para nueva validacion.`),
-          updatedAt
-        }
+  async function recordSale(sale: Sale) {
+    await apiFetch("/api/sales", {
+      method: "POST",
+      body: JSON.stringify({
+        items: JSON.stringify(sale.items),
+        total: sale.total,
+        paymentMethod: sale.paymentMethod,
+        vendorId: sale.vendorId,
+        vendorName: sale.vendorName,
+        createdAt: new Date(sale.createdAt),
+      }),
+    });
+    for (const item of sale.items) {
+      await apiFetch(`/api/inventory/${encodeURIComponent(item.sku)}/adjust?delta=${-item.quantity}`, {
+        method: "POST",
+      });
+    }
+  }
+
+  async function getAllSales(): Promise<Sale[]> {
+    try {
+      const raw = await apiFetch<Array<{ id: number; items: string; total: number; paymentMethod: string; vendorId: string; vendorName: string; createdAt: string }>>("/api/sales");
+      return raw.map((s) => ({
+        id: `sale-${s.id}`,
+        items: JSON.parse(s.items),
+        total: s.total,
+        paymentMethod: s.paymentMethod,
+        vendorId: s.vendorId,
+        vendorName: s.vendorName,
+        createdAt: s.createdAt,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async function validateOrder(order: Order, decision: OrderDecisionType, _note?: string) {
+    const status = decision === "approved" ? "CONFIRMED" : decision === "rejected" ? "REJECTED" : "CREATED";
+    await apiFetch(`/api/orders/${order.id}/status?status=${status}`, { method: "PUT" });
+    if (decision === "approved") {
+      try {
+        await apiFetch("/api/shipments", {
+          method: "POST",
+          body: JSON.stringify({ orderId: Number(order.id), customerId: Number(order.customerId), sku: order.sku, quantity: order.quantity }),
+        });
+      } catch {
+        // Shipment may already exist from SQS event
       }
-    };
-    commit(next);
+    }
   }
 
-  function adjustInventory(product: Product, delta: number, reason?: string) {
-    const entry: StoredInventoryAdjustment = {
-      id: buildId("adj"),
-      sku: product.sku,
-      delta,
-      reason: reason?.trim() || `Ajuste manual de ${delta > 0 ? "reposicion" : "reserva"}.`,
-      updatedAt: new Date().toISOString()
-    };
-    commit({ ...store, inventoryAdjustments: [entry, ...store.inventoryAdjustments] });
+  function createDispatch(_order: Order, _carrier: string, _note?: string) {
+    // Pending: POST /api/shipments endpoint
   }
 
-  function createDispatch(order: Order, carrier: string, note?: string) {
-    const createdAt = new Date().toISOString();
-    const shipment: StoredManualShipment = {
-      id: buildId("shp"),
-      orderId: order.id,
-      customerId: order.customer,
-      sku: order.sku,
-      quantity: order.quantity,
-      carrier: carrier.trim() || "Transportista local",
-      tracking: createTracking(order.id),
-      stage: "picked_up",
-      eta: null,
-      createdAt,
-      shippedAt: createdAt,
-      note: note?.trim() || `Despacho generado manualmente para el pedido ${order.id}.`
-    };
-    commit({ ...store, manualShipments: [shipment, ...store.manualShipments] });
-  }
-
-  function updateShipmentStage(shipment: Shipment, stage: ShipmentStage, note?: string) {
-    const next: OperationalStore = {
-      ...store,
-      shipmentUpdates: {
-        ...store.shipmentUpdates,
-        [shipment.id]: {
-          shipmentId: shipment.id,
-          stage,
-          note:
-            note?.trim() ||
-            (stage === "out_for_delivery"
-              ? `Envio ${shipment.id} marcado en reparto.`
-              : stage === "delivered"
-                ? `Envio ${shipment.id} entregado al cliente.`
-                : `Envio ${shipment.id} requiere seguimiento por retraso.`),
-          updatedAt: new Date().toISOString()
-        }
-      }
-    };
-    commit(next);
+  async function updateShipmentStage(shipment: Shipment, stage: ShipmentStage, _note?: string, proof?: { proofOfDeliveryImage?: string; recipientRut?: string }) {
+    const body = proof ? JSON.stringify(proof) : undefined;
+    await apiFetch(`/api/shipments/${shipment.id}/stage?stage=${stage}`, { method: "PUT", body });
   }
 
   return {
     operationalOrders,
     operationalInventory,
-    operationalShipments: mergedShipments,
+    operationalShipments,
     validationQueue,
     dispatchQueue,
     stockQueue,
@@ -362,6 +194,10 @@ export function useOperationalWorkspace({
     validateOrder,
     adjustInventory,
     createDispatch,
-    updateShipmentStage
+    updateShipmentStage,
+    recordSale,
+    getAllSales,
+    addProduct,
+    deleteProduct,
   };
 }

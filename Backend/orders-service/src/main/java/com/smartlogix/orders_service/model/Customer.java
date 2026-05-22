@@ -1,4 +1,4 @@
-package com.inventory_service.model;
+package com.smartlogix.orders_service.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,32 +11,32 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "inventory")
+@Table(name = "customers")
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class Inventory {
+public class Customer {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String sku;
-
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false)
-    private Integer stock;
+    @Column(length = 50)
+    private String phone;
 
-    @Column(nullable = false)
-    private Integer price;
+    @Column(length = 200)
+    private String address;
 
-    @Column(nullable = false)
-    private Integer cost;
+    @Column(length = 100)
+    private String email;
 
-    @Column(nullable = false)
-    private String category;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 }

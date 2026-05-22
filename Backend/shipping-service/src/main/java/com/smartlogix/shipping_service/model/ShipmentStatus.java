@@ -1,8 +1,10 @@
 package com.smartlogix.shipping_service.model;
 
 public enum ShipmentStatus {
-    PENDING,
-    IN_TRANSIT,
+    LABEL_CREATED,
+    PICKED_UP,
+    HUB,
+    OUT_FOR_DELIVERY,
     DELIVERED,
-    FAILED
+    DELAYED
 }

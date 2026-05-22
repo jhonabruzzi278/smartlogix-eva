@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
-import { shipments as fallbackShipments } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { adaptShipment } from "@/lib/api-adapters";
 import { cn } from "@/lib/utils";
@@ -15,7 +14,7 @@ export function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const { data: shipments } = useApiQuery<ApiShipment[], Shipment[]>({
-    path: "/api/shipments", fallbackData: fallbackShipments, transform: (r) => r.map(adaptShipment)
+    path: "/api/shipments", transform: (r) => r.map(adaptShipment)
   });
 
   const year = currentDate.getFullYear();
@@ -83,18 +82,18 @@ export function CalendarPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#939FAD]">Calendario</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Calendario</p>
           <h1 className="text-xl font-bold text-[#112b4a]">Despachos programados</h1>
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={prevMonth} className="flex h-9 w-9 items-center justify-center rounded border border-[#DCE0E2] bg-white text-[#939FAD] hover:bg-[#F5F7F9]">
+          <button onClick={prevMonth} className="flex h-9 w-9 items-center justify-center rounded border border-[#DCE0E2] bg-white text-[#6B7280] hover:bg-[#F5F7F9]">
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="min-w-[140px] text-center text-sm font-bold text-[#112b4a]">
             {MONTHS[month]} {year}
           </span>
-          <button onClick={nextMonth} className="flex h-9 w-9 items-center justify-center rounded border border-[#DCE0E2] bg-white text-[#939FAD] hover:bg-[#F5F7F9]">
+          <button onClick={nextMonth} className="flex h-9 w-9 items-center justify-center rounded border border-[#DCE0E2] bg-white text-[#6B7280] hover:bg-[#F5F7F9]">
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -103,15 +102,15 @@ export function CalendarPage() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded border border-[#DCE0E2] bg-white p-3 text-center">
-          <p className="text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Totales</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Totales</p>
           <p className="mt-1 text-xl font-bold text-[#112b4a]">{stats.total}</p>
         </div>
         <div className="rounded border border-[#DCE0E2] bg-white p-3 text-center">
-          <p className="text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">En curso</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">En curso</p>
           <p className="mt-1 text-xl font-bold text-[#4EB4A5]">{stats.active}</p>
         </div>
         <div className="rounded border border-[#DCE0E2] bg-white p-3 text-center">
-          <p className="text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">Programados</p>
+          <p className="text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Programados</p>
           <p className="mt-1 text-xl font-bold text-[#4B98CF]">{stats.scheduled}</p>
         </div>
       </div>
@@ -122,7 +121,7 @@ export function CalendarPage() {
           {/* Weekday headers */}
           <div className="grid grid-cols-7">
             {WEEKDAYS.map((wd) => (
-              <div key={wd} className="border-b border-r border-[#ECEEF0] px-2 py-2.5 text-center text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#939FAD] last:border-r-0">
+              <div key={wd} className="border-b border-r border-[#ECEEF0] px-2 py-2.5 text-center text-[0.625rem] font-bold uppercase tracking-[0.92px] text-[#6B7280] last:border-r-0">
                 {wd}
               </div>
             ))}
@@ -169,7 +168,7 @@ export function CalendarPage() {
                           </Link>
                         ))}
                         {dayShipments.length > 2 && (
-                          <p className="text-[8px] sm:text-[9px] text-[#939FAD] pl-1">+{dayShipments.length - 2} mas</p>
+                          <p className="text-[8px] sm:text-[9px] text-[#6B7280] pl-1">+{dayShipments.length - 2} mas</p>
                         )}
                       </div>
                     </>
@@ -211,7 +210,7 @@ export function CalendarPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-[#112b4a]">{s.tracking}</p>
-                        <p className="text-xs text-[#939FAD]">Pedido #{s.orderId} | SKU {s.sku}</p>
+                        <p className="text-xs text-[#6B7280]">Pedido #{s.orderId} | SKU {s.sku}</p>
                       </div>
                     </div>
                     <span className={cn(
@@ -226,7 +225,7 @@ export function CalendarPage() {
                 ))}
             </div>
           ) : (
-            <p className="py-6 text-center text-xs text-[#939FAD]">No hay envios programados para hoy</p>
+            <p className="py-6 text-center text-xs text-[#6B7280]">No hay envios programados para hoy</p>
           )}
         </div>
       </div>

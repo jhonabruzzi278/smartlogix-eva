@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Key, LogIn, Mail } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getDefaultPathForRole, isPathAllowedForRole } from "@/app/access";
@@ -67,7 +67,7 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#939FAD]" />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
               <Input
                 id="username"
                 type="email"
@@ -76,12 +76,12 @@ export function LoginPage() {
                 placeholder="admin@smartlogix.cl"
                 autoComplete="username"
                 disabled={busy}
-                className="h-10 border-[#DDE0E2] bg-[#F8FBFD] pl-9 text-sm placeholder:text-[#939FAD]"
+                className="h-10 border-[#DDE0E2] bg-[#F8FBFD] pl-9 text-sm placeholder:text-[#6B7280]"
               />
             </div>
 
             <div className="relative">
-              <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#939FAD]" />
+              <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
               <Input
                 id="password"
                 type="password"
@@ -90,7 +90,7 @@ export function LoginPage() {
                 placeholder="Contrasena"
                 autoComplete="current-password"
                 disabled={busy}
-                className="h-10 border-[#DDE0E2] bg-[#F8FBFD] pl-9 text-sm placeholder:text-[#939FAD]"
+                className="h-10 border-[#DDE0E2] bg-[#F8FBFD] pl-9 text-sm placeholder:text-[#6B7280]"
               />
             </div>
 
@@ -117,7 +117,7 @@ export function LoginPage() {
           </form>
 
           <div className="mt-5 border-t border-[#ECEEF0] pt-4">
-            <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#939FAD]">
+            <p className="mb-2 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
               Acceso rapido
             </p>
             <div className="space-y-1">
@@ -145,7 +145,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-5 text-center text-[0.75rem] text-[#939FAD]">
+        <p className="mt-5 text-center text-[0.75rem] text-[#6B7280]">
           Entorno de desarrollo local &middot; SmartLogix v2.0
         </p>
       </div>

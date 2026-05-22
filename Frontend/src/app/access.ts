@@ -12,7 +12,9 @@ export type AppPermission =
   | "shipments.update"
   | "alerts.view"
   | "users.view"
-  | "users.manage";
+  | "users.manage"
+  | "sales.create"
+  | "sales.view";
 
 export interface RoleAccessProfile {
   label: string;
@@ -22,14 +24,14 @@ export interface RoleAccessProfile {
   permissions: AppPermission[];
 }
 
-const basePaths = ["/access-denied", "/profile", "/notifications", "/calendar", "/reports"];
+const basePaths = ["/access-denied", "/profile", "/notifications", "/calendar", "/reports", "/pos"];
 
 export const roleProfiles: Record<Role, RoleAccessProfile> = {
   owner: {
     label: "Administrador",
     summary: "Control completo de la operacion, seguimiento transversal y gestion de usuarios del negocio.",
     defaultPath: "/dashboard",
-    paths: ["/dashboard", "/inventory", "/orders", "/shipments", "/alerts", "/users", ...basePaths],
+    paths: ["/dashboard", "/inventory", "/orders", "/customers", "/shipments", "/deliveries", "/alerts", "/users", ...basePaths],
     permissions: [
       "dashboard.view",
       "inventory.view",
@@ -42,14 +44,16 @@ export const roleProfiles: Record<Role, RoleAccessProfile> = {
       "shipments.update",
       "alerts.view",
       "users.view",
-      "users.manage"
+      "users.manage",
+      "sales.create",
+      "sales.view"
     ]
   },
   ops: {
     label: "Operaciones",
     summary: "Gestiona el flujo diario: crea pedidos, revisa incidencias y coordina despacho.",
     defaultPath: "/orders",
-    paths: ["/dashboard", "/inventory", "/orders", "/shipments", "/alerts", ...basePaths],
+    paths: ["/dashboard", "/inventory", "/orders", "/customers", "/shipments", "/deliveries", "/alerts", ...basePaths],
     permissions: [
       "dashboard.view",
       "inventory.view",
@@ -59,14 +63,15 @@ export const roleProfiles: Record<Role, RoleAccessProfile> = {
       "shipments.view",
       "shipments.dispatch",
       "shipments.update",
-      "alerts.view"
+      "alerts.view",
+      "sales.view"
     ]
   },
   warehouse: {
     label: "Bodega",
     summary: "Controla stock, confirma disponibilidad y responde a quiebres o ajustes de inventario.",
     defaultPath: "/inventory",
-    paths: ["/dashboard", "/inventory", "/orders", "/alerts", ...basePaths],
+    paths: ["/dashboard", "/inventory", "/orders", "/customers", "/alerts", ...basePaths],
     permissions: [
       "dashboard.view",
       "inventory.view",
@@ -80,7 +85,7 @@ export const roleProfiles: Record<Role, RoleAccessProfile> = {
     label: "Soporte",
     summary: "Monitorea continuidad operativa, revisa trazabilidad y escala incidentes sin ejecutar cambios de negocio.",
     defaultPath: "/alerts",
-    paths: ["/dashboard", "/orders", "/shipments", "/alerts", ...basePaths],
+    paths: ["/dashboard", "/orders", "/customers", "/shipments", "/alerts", ...basePaths],
     permissions: [
       "dashboard.view",
       "orders.view",
@@ -92,7 +97,7 @@ export const roleProfiles: Record<Role, RoleAccessProfile> = {
     label: "Cliente",
     summary: "Consulta pedidos y envios sin intervenir la operacion interna.",
     defaultPath: "/orders",
-    paths: ["/orders", "/shipments", ...basePaths],
+    paths: ["/orders", "/customers", "/shipments", ...basePaths],
     permissions: [
       "orders.view",
       "shipments.view"
@@ -101,12 +106,24 @@ export const roleProfiles: Record<Role, RoleAccessProfile> = {
   shipper: {
     label: "Transportista",
     summary: "Gestiona las entregas asignadas, actualiza estados de ruta y reporta retrasos operativos.",
-    defaultPath: "/shipments",
-    paths: ["/shipments", "/alerts", ...basePaths],
+    defaultPath: "/deliveries",
+    paths: ["/deliveries", "/shipments", "/alerts", ...basePaths],
     permissions: [
       "shipments.view",
       "shipments.update",
       "alerts.view"
+    ]
+  },
+  vendor: {
+    label: "Vendedor",
+    summary: "Registra ventas en caja, revisa stock disponible y consulta sus propias ventas del dia.",
+    defaultPath: "/pos",
+    paths: ["/dashboard", "/inventory", "/pos", ...basePaths],
+    permissions: [
+      "dashboard.view",
+      "inventory.view",
+      "sales.create",
+      "sales.view"
     ]
   }
 };

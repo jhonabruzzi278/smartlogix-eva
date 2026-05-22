@@ -33,7 +33,7 @@ export const REGISTERED_USERS: RegisteredUser[] = [
     role: "warehouse",
     groups: ["bodega", "warehouse"],
     team: "Bodega",
-    summary: "Controla stock, cobertura y ajustes manuales de inventario."
+    summary: "Controla stock y ajustes manuales de inventario."
   },
   {
     username: "soporte@smartlogix.cl",
@@ -50,6 +50,22 @@ export const REGISTERED_USERS: RegisteredUser[] = [
     groups: ["transportista", "shipper"],
     team: "Transporte",
     summary: "Actualiza entregas, confirma reparto y reporta retrasos o novedades de ruta."
+  },
+  {
+    username: "maria@smartlogix.cl",
+    name: "Maria Gonzalez",
+    role: "vendor",
+    groups: ["vendedor", "vendor"],
+    team: "Ventas",
+    summary: "Vendedora de tienda. Registra ventas en caja y atiende clientes."
+  },
+  {
+    username: "carlos@smartlogix.cl",
+    name: "Carlos Muñoz",
+    role: "vendor",
+    groups: ["vendedor", "vendor"],
+    team: "Ventas",
+    summary: "Vendedor de tienda. Responsable de atencion al cliente y registro de ventas."
   }
 ];
 
