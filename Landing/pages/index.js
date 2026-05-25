@@ -9,7 +9,6 @@ import Pricing1 from "@/components/sections/Pricing1"
 import Requestquote1 from "@/components/sections/Requestquote1"
 import Services1 from "@/components/sections/Services1"
 import Stats1 from "@/components/sections/Stats1"
-import Testimonial1 from "@/components/sections/Testimonial1"
 
 export default function Home() {
     return (
@@ -19,7 +18,6 @@ export default function Home() {
             <Services1 />
             <Info1 />
             <Howitwork1 />
-            <Testimonial1 />
             <Stats1 />
             <Pricing1 />
             <Requestquote1 />
