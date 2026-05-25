@@ -1,6 +1,6 @@
 export default function Howitwork1() {
     return (
-        <section className="section pt-85 bg-worldmap" id="como-funciona">
+        <section className="section pt-85 pb-100 bg-worldmap howitwork-section" id="como-funciona">
             <div className="container">
                 <div className="text-center">
                     <img className="mb-15" src="/assets/imgs/template/icons/favicon.svg" alt="smartlogix" />
@@ -88,6 +88,31 @@ export default function Howitwork1() {
                     line-height: 1;
                     display: block;
                     text-align: center;
+                }
+            `}</style>
+            <style jsx global>{`
+                .howitwork-section {
+                    position: relative;
+                }
+                .howitwork-section .list-how-works li {
+                    padding: 20px 0;
+                    transition: all 0.3s ease;
+                }
+                .howitwork-section .list-how-works li:hover {
+                    transform: translateX(8px);
+                }
+                .howitwork-section .list-how-works li .image-how .img {
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 16px rgba(254,194,1,0.2);
+                }
+                .howitwork-section .list-how-works li:hover .image-how .img {
+                    transform: scale(1.05);
+                    box-shadow: 0 8px 24px rgba(254,194,1,0.3);
+                }
+                .howitwork-section .box-image-how {
+                    border-radius: 16px;
+                    overflow: hidden;
+                    box-shadow: 0 20px 60px rgba(3,68,96,0.15);
                 }
             `}</style>
         </section>
