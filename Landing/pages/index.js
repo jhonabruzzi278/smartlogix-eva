@@ -1,5 +1,4 @@
 import Layout from "@/components/layout/Layout"
-import Brands1 from "@/components/sections/Brands1"
 import Cta1 from "@/components/sections/Cta1"
 import Faqs1 from "@/components/sections/Faqs1"
 import Hero1 from "@/components/sections/Hero1"
@@ -14,7 +13,6 @@ export default function Home() {
     return (
         <Layout>
             <Hero1 />
-            <Brands1 />
             <Services1 />
             <Info1 />
             <Howitwork1 />
