@@ -2,69 +2,46 @@ import Link from "next/link"
 
 export default function Sidebar({ openClass, handleMobileMenuClose }) {
     return (
-        <div className={openClass ? "mobile-header-active mobile-menu-active" : "mobile-header-active"}>
-            <div className="sidebar-content">
-                <div className="mobile-header-logo mb-30">
-                    <div className="d-flex align-items-center justify-content-between">
+        <div className={`fixed inset-0 z-[60] pointer-events-none ${openClass ? '' : 'hidden'}`}>
+            <div className="absolute inset-0 bg-black/50 pointer-events-auto" onClick={handleMobileMenuClose}/>
+            <div className={`absolute top-0 right-0 w-80 h-full bg-white shadow-2xl pointer-events-auto transition-transform duration-300 ${openClass ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="flex flex-col h-full p-6">
+                    <div className="flex items-center justify-between pb-5 border-b border-gray-200">
                         <Link href="/" onClick={handleMobileMenuClose}>
-                            <svg width="150" height="36" viewBox="0 0 150 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="2" y="4" width="28" height="28" rx="7" fill="#FEC201"/>
-                                <text x="9" y="23" fontFamily="Arial" fontWeight="900" fontSize="16" fill="#034460">S</text>
-                                <text x="37" y="24" fontFamily="Arial" fontWeight="800" fontSize="18" fill="#034460">SmartLogix</text>
+                            <svg width="130" height="32" viewBox="0 0 130 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="2" y="3" width="26" height="26" rx="7" fill="#FEC201"/>
+                                <text x="8" y="21" fontFamily="Arial" fontWeight="900" fontSize="15" fill="#034460">S</text>
+                                <text x="35" y="21" fontFamily="Arial" fontWeight="800" fontSize="16" fill="#034460">SmartLogix</text>
                             </svg>
                         </Link>
-                        <button className="off-canvas-close" onClick={handleMobileMenuClose} style={{width:40,height:40,borderRadius:8,border:'1px solid #CDE2E7',background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#034460" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
+                        <button onClick={handleMobileMenuClose} className="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
+                    <nav className="flex-1 py-6">
+                        <ul className="space-y-0">
+                            {["Inicio","Características","Cómo Funciona","Planes","Solicitar Demo","FAQ"].map((item, i) => {
+                                const hrefs = ["/","#caracteristicas","#como-funciona","#planes","#demo","#faq"]
+                                return (
+                                    <li key={i}>
+                                        <Link href={hrefs[i]} onClick={handleMobileMenuClose}
+                                            className="block py-3.5 font-semibold text-brand-2 hover:text-brand-1 border-b border-gray-100 transition-colors"
+                                        >{item}</Link>
+                                    </li>
+                                )
+                            })}
+                        </ul>
+                    </nav>
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                        <Link href="https://app.smartlogix.cl" onClick={handleMobileMenuClose}
+                            className="block w-full text-center text-sm font-bold text-brand-2 bg-brand-1 hover:bg-yellow-400 py-3 rounded-lg transition-colors"
+                        >Iniciar Sesión</Link>
+                        <a href="#demo" onClick={handleMobileMenuClose}
+                            className="block w-full text-center text-sm font-bold text-white bg-brand-2 hover:bg-brand-5 py-3 rounded-lg transition-colors"
+                        >Solicitar Demo</a>
+                    </div>
                 </div>
-                <nav className="mobile-menu">
-                    <ul className="menu-accordion">
-                        <li><Link href="/" onClick={handleMobileMenuClose} className="menu-link-mobile">Inicio</Link></li>
-                        <li><a href="#caracteristicas" onClick={handleMobileMenuClose} className="menu-link-mobile">Características</a></li>
-                        <li><a href="#como-funciona" onClick={handleMobileMenuClose} className="menu-link-mobile">Cómo Funciona</a></li>
-                        <li><a href="#planes" onClick={handleMobileMenuClose} className="menu-link-mobile">Planes</a></li>
-                        <li><a href="#demo" onClick={handleMobileMenuClose} className="menu-link-mobile">Solicitar Demo</a></li>
-                        <li><a href="#faq" onClick={handleMobileMenuClose} className="menu-link-mobile">FAQ</a></li>
-                        <li className="mt-30">
-                            <Link href="https://app.smartlogix.cl" className="btn btn-brand-1 w-100 text-center" onClick={handleMobileMenuClose}>
-                                Iniciar Sesión
-                            </Link>
-                        </li>
-                        <li className="mt-10">
-                            <a href="#demo" className="btn btn-brand-2-full w-100 text-center" onClick={handleMobileMenuClose}>
-                                Solicitar Demo
-                            </a>
-                        </li>
-                    </ul>
-                </nav>
             </div>
-            <style jsx global>{`
-                .menu-link-mobile {
-                    display: block;
-                    padding: 14px 0;
-                    font-size: 16px;
-                    font-weight: 600;
-                    color: #034460;
-                    border-bottom: 1px solid #F2F3F4;
-                    text-decoration: none;
-                    transition: color 0.2s ease;
-                }
-                .menu-link-mobile:hover {
-                    color: #FEC201;
-                }
-                .mobile-header-logo {
-                    padding-bottom: 16px;
-                    border-bottom: 1px solid #CDE2E7;
-                }
-                .menu-accordion {
-                    list-style: none;
-                    padding: 0;
-                    margin: 0;
-                }
-            `}</style>
         </div>
     )
 }

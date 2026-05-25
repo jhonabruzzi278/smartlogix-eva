@@ -1,75 +1,59 @@
 import Link from "next/link"
 
-export default function Footer1() {
+export default function Footer() {
     return (
-        <footer className="footer">
-            <div className="footer-1">
-                <div className="container">
-                    <div className="row">
-                        <div className="col-lg-3 width-23 mb-30">
-                            <div className="mb-20">
-                                <svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="0" y="4" width="32" height="32" rx="8" fill="#FEC201"/>
-                                    <text x="6" y="26" fontFamily="Arial" fontWeight="bold" fontSize="16" fill="#034460">S</text>
-                                    <text x="38" y="27" fontFamily="Arial" fontWeight="800" fontSize="20" fill="white">SmartLogix</text>
-                                </svg>
-                            </div>
-                            <p className="font-xs mb-20 color-white">SmartLogix es la plataforma todo-en-uno para pequeños comercios. POS, inventario, pedidos, despachos y dashboard en un solo lugar.</p>
-                            <h6 className="color-brand-1">Síguenos</h6>
-                            <div className="mt-15">
-                                <Link className="icon-socials icon-facebook" href="#" />
-                                <Link className="icon-socials icon-instagram" href="#" />
-                                <Link className="icon-socials icon-twitter" href="#" />
-                                <Link className="icon-socials icon-youtube" href="#" />
-                            </div>
+        <footer className="bg-brand-2">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+                    <div>
+                        <svg width="150" height="36" viewBox="0 0 150 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-5">
+                            <rect x="2" y="5" width="26" height="26" rx="7" fill="#FEC201"/>
+                            <text x="8" y="23" fontFamily="Arial" fontWeight="900" fontSize="15" fill="#034460">S</text>
+                            <text x="36" y="23" fontFamily="Arial" fontWeight="800" fontSize="17" fill="white">SmartLogix</text>
+                        </svg>
+                        <p className="text-sm text-white/70 mb-5">SmartLogix es la plataforma todo-en-uno para pequeños comercios. POS, inventario, pedidos, despachos y dashboard en un solo lugar.</p>
+                        <h6 className="text-brand-1 font-semibold mb-3">Síguenos</h6>
+                        <div className="flex gap-3">
+                            {["facebook","instagram","twitter","youtube"].map(s => (
+                                <Link key={s} href="#" className="w-9 h-9 rounded-lg bg-white/10 hover:bg-brand-1/20 flex items-center justify-center text-white/60 hover:text-brand-1 transition-colors">{s[0].toUpperCase()}</Link>
+                            ))}
                         </div>
-                        <div className="col-lg-3 width-16 mb-30">
-                            <h5 className="mb-10 color-brand-1">Producto</h5>
-                            <ul className="menu-footer">
-                                <li><a href="#caracteristicas">Características</a></li>
-                                <li><a href="#como-funciona">Cómo Funciona</a></li>
-                                <li><a href="#planes">Planes y Precios</a></li>
-                                <li><a href="#demo">Solicitar Demo</a></li>
-                                <li><a href="#faq">Preguntas Frecuentes</a></li>
-                            </ul>
-                        </div>
-                        <div className="col-lg-3 width-16 mb-30">
-                            <h5 className="mb-10 color-brand-1">Empresa</h5>
-                            <ul className="menu-footer">
-                                <li><Link href="#">Sobre Nosotros</Link></li>
-                                <li><Link href="#">Blog</Link></li>
-                                <li><Link href="#">Carreras</Link></li>
-                                <li><Link href="#">Prensa</Link></li>
-                            </ul>
-                        </div>
-                        <div className="col-lg-3 width-20 mb-30">
-                            <h5 className="mb-10 color-brand-1">Contacto</h5>
-                            <ul className="menu-footer">
-                                <li><Link href="mailto:contacto@smartlogix.cl">contacto@smartlogix.cl</Link></li>
-                                <li><Link href="tel:+56912345678">+56 9 1234 5678</Link></li>
-                                <li><span className="color-grey-300">Santiago, Chile</span></li>
-                            </ul>
-                            <h6 className="color-brand-1 mt-20 mb-10">Horario</h6>
-                            <p className="font-xs color-white">Lun - Vie: 9:00 - 18:00</p>
-                        </div>
+                    </div>
+                    <div>
+                        <h5 className="text-brand-1 font-bold mb-4">Producto</h5>
+                        <ul className="space-y-3">
+                            {["Características","Cómo Funciona","Planes y Precios","Solicitar Demo","Preguntas Frecuentes"].map((item, i) => (
+                                <li key={i}><a href={["#caracteristicas","#como-funciona","#planes","#demo","#faq"][i]} className="text-sm text-white/60 hover:text-brand-1 transition-colors">{item}</a></li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div>
+                        <h5 className="text-brand-1 font-bold mb-4">Empresa</h5>
+                        <ul className="space-y-3">
+                            {["Sobre Nosotros","Blog","Carreras","Prensa"].map((item, i) => (
+                                <li key={i}><Link href="#" className="text-sm text-white/60 hover:text-brand-1 transition-colors">{item}</Link></li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div>
+                        <h5 className="text-brand-1 font-bold mb-4">Contacto</h5>
+                        <ul className="space-y-3">
+                            <li><a href="mailto:contacto@smartlogix.cl" className="text-sm text-white/60 hover:text-brand-1 transition-colors">contacto@smartlogix.cl</a></li>
+                            <li><a href="tel:+56912345678" className="text-sm text-white/60 hover:text-brand-1 transition-colors">+56 9 1234 5678</a></li>
+                            <li><span className="text-sm text-white/50">Santiago, Chile</span></li>
+                        </ul>
+                        <h6 className="text-brand-1 font-semibold mt-5 mb-2">Horario</h6>
+                        <p className="text-sm text-white/70">Lun - Vie: 9:00 - 18:00</p>
                     </div>
                 </div>
             </div>
-            <div className="footer-2">
-                <div className="container">
-                    <div className="footer-bottom">
-                        <div className="row align-items-center">
-                            <div className="col-lg-6 col-md-12 text-center text-lg-start">
-                                <span className="color-grey-300 font-md">&copy; SmartLogix {new Date().getFullYear()}. Todos los derechos reservados.</span>
-                            </div>
-                            <div className="col-lg-6 col-md-12 text-center text-lg-end">
-                                <ul className="menu-bottom">
-                                    <li><Link className="font-sm color-grey-300" href="#">Política de Privacidad</Link></li>
-                                    <li><Link className="font-sm color-grey-300" href="#">Términos del Servicio</Link></li>
-                                    <li><Link className="font-sm color-grey-300" href="#">Cookies</Link></li>
-                                </ul>
-                            </div>
-                        </div>
+            <div className="border-t border-white/10">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <span className="text-sm text-white/50">© SmartLogix {new Date().getFullYear()}. Todos los derechos reservados.</span>
+                    <div className="flex gap-6">
+                        {["Política de Privacidad","Términos del Servicio","Cookies"].map((item, i) => (
+                            <Link key={i} href="#" className="text-xs text-white/40 hover:text-white/60 transition-colors">{item}</Link>
+                        ))}
                     </div>
                 </div>
             </div>

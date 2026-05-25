@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react"
 
 export default function BackToTop() {
-    const [scroll, setScroll] = useState(0)
+    const [visible, setVisible] = useState(false)
     useEffect(() => {
-        document.addEventListener("scroll", () => {
-            const scrollCheck = window.scrollY > 100
-            if (scrollCheck !== scroll) {
-                setScroll(scrollCheck)
-            }
-        })
-    })
+        const handler = () => setVisible(window.scrollY > 400)
+        window.addEventListener("scroll", handler, { passive: true })
+        return () => window.removeEventListener("scroll", handler)
+    }, [])
     return (
-        <a className={scroll ? "btn-scroll-top active" : "btn-scroll-top"} href="#top">
-            <svg className="icon-turn-arrow" width={12} height={8} viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.0001 7.00006L6.00006 2.00006L1.00006 7.00006" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <a href="#top"
+            className={`fixed bottom-6 right-6 w-11 h-11 rounded-full bg-brand-2 text-white flex items-center justify-center shadow-lg hover:bg-brand-5 hover:-translate-y-0.5 transition-all z-50 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'}`}
+        >
+            <svg width="14" height="10" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 7L6 2L1 7"/>
             </svg>
         </a>
     )

@@ -6,41 +6,33 @@ import PageHead from './PageHead'
 import Sidebar from './Sidebar'
 
 export default function Layout({ headTitle, children }) {
-    const [scroll, setScroll] = useState(0)
+    const [scroll, setScroll] = useState(false)
     const [openClass, setOpenClass] = useState('')
 
     const handleMobileMenuOpen = () => {
-        document.body.classList.add("mobile-menu-active")
+        document.body.classList.add("overflow-hidden")
         setOpenClass("sidebar-visible")
     }
 
     const handleMobileMenuClose = () => {
-        if (openClass === "sidebar-visible") {
-            setOpenClass("")
-            document.body.classList.remove("mobile-menu-active")
-        }
+        setOpenClass("")
+        document.body.classList.remove("overflow-hidden")
     }
 
     useEffect(() => {
-        document.addEventListener("scroll", () => {
-            const scrollCheck = window.scrollY > 100
-            if (scrollCheck !== scroll) {
-                setScroll(scrollCheck)
-            }
-        })
-
-        const WOW = require('wowjs')
-        window.wow = new WOW.WOW({ live: false })
-        window.wow.init()
+        const handleScroll = () => {
+            setScroll(window.scrollY > 100)
+        }
+        window.addEventListener("scroll", handleScroll, { passive: true })
+        return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
     return (
         <>
             <PageHead headTitle={headTitle} />
-            <div className="body-overlay-1" onClick={handleMobileMenuClose} />
             <Header1 scroll={scroll} handleMobileMenuOpen={handleMobileMenuOpen} />
             <Sidebar openClass={openClass} handleMobileMenuClose={handleMobileMenuClose} />
-            <main className="main">
+            <main className="min-h-screen">
                 {children}
             </main>
             <Footer />
