@@ -1,0 +1,135 @@
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: smartlogix-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin123
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c effective_cache_size=64MB
+      -c maintenance_work_mem=16MB
+      -c wal_buffers=2MB
+      -c max_connections=20
+      -c work_mem=1MB
+      -c max_wal_size=128MB
+      -c min_wal_size=32MB
+      -c random_page_cost=1.1
+      -c max_worker_processes=2
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./Backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  orders-service:
+    image: jonahbruzzi/orders-service:latest
+    container_name: smartlogix-orders
+    restart: unless-stopped
+    environment:
+      - DB_URL=jdbc:postgresql://postgres-db:5432/orders_db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin123
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+        reservations:
+          memory: 80M
+
+  inventory-service:
+    image: jonahbruzzi/inventory-service:latest
+    container_name: smartlogix-inventory
+    restart: unless-stopped
+    environment:
+      - DB_URL=jdbc:postgresql://postgres-db:5432/inventory_db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin123
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+        reservations:
+          memory: 80M
+
+  shipping-service:
+    image: jonahbruzzi/shipping-service:latest
+    container_name: smartlogix-shipping
+    restart: unless-stopped
+    environment:
+      - DB_URL=jdbc:postgresql://postgres-db:5432/shipping_db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin123
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+        reservations:
+          memory: 80M
+
+  notification-service:
+    image: jonahbruzzi/notification-service:latest
+    container_name: smartlogix-notification
+    restart: unless-stopped
+    environment:
+      - DB_URL=jdbc:postgresql://postgres-db:5432/notification_db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin123
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+        reservations:
+          memory: 80M
+
+  api-gateway:
+    image: nginx:alpine
+    container_name: smartlogix-api-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - orders-service
+      - inventory-service
+      - shipping-service
+      - notification-service
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+        reservations:
+          memory: 16M
+
+volumes:
+  postgres_data:
