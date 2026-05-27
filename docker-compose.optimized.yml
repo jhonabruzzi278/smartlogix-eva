@@ -39,7 +39,7 @@ services:
 
   # LocalStack ligero: solo SQS + SNS (fallback cuando no hay AWS real)
   localstack:
-    image: localstack/localstack:4-slim
+    image: localstack/localstack:4
     container_name: smartlogix-localstack
     restart: unless-stopped
     environment:
