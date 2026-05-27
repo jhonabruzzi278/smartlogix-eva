@@ -69,7 +69,7 @@ services:
       - CLOUDWATCH_LOG_GROUP=/smartlogix/orders-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -80,7 +80,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          memory: 256M
         reservations:
           memory: 80M
 
@@ -101,7 +101,7 @@ services:
       - CLOUDWATCH_LOG_GROUP=/smartlogix/inventory-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -112,7 +112,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          memory: 256M
         reservations:
           memory: 80M
 
@@ -134,7 +134,7 @@ services:
       - CLOUDWATCH_LOG_GROUP=/smartlogix/shipping-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -145,7 +145,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          memory: 256M
         reservations:
           memory: 80M
 
@@ -166,7 +166,7 @@ services:
       - CLOUDWATCH_LOG_GROUP=/smartlogix/notification-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -177,7 +177,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          memory: 256M
         reservations:
           memory: 80M
 
