@@ -51,9 +51,9 @@ public class OrderService {
         orderRepository.save(order);
 
         try {
-            restTemplate.put(
+            restTemplate.postForEntity(
                     "http://inventory-service:8082/api/inventory/" + order.getSku() + "/adjust?delta=-" + order.getQuantity(),
-                    null
+                    null, Void.class
             );
 
             Map<String, Object> shipmentRequest = Map.of(
@@ -85,9 +85,9 @@ public class OrderService {
 
         if (prevStatus == OrderStatus.EN_PREPARACION) {
             try {
-                restTemplate.put(
+                restTemplate.postForEntity(
                         "http://inventory-service:8082/api/inventory/" + order.getSku() + "/adjust?delta=+" + order.getQuantity(),
-                        null
+                        null, Void.class
                 );
             } catch (Exception e) {
                 log.error("Error al restaurar stock para orden cancelada {}: {}", orderId, e.getMessage());
