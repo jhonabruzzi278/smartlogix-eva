@@ -26,6 +26,27 @@ Se seleccionó **GitFlow** como estrategia base con adaptaciones para el context
 | `release/*` | Preparación de versión para producción | `release/vX.Y.Z` | `develop` | `main` + `develop` |
 | `hotfix/*` | Correcciones urgentes en producción | `hotfix/descripcion` | `main` | `main` + `develop` |
 
+### Ramas de Desarrollador
+
+Cada desarrollador tiene una rama personal donde integra sus features antes de mergear a `develop`. Esto permite trabajo aislado y revisión de código antes de la integración.
+
+| Rama | Desarrollador | Responsabilidad | Módulos |
+|---|---|---|---|
+| `victor` | Víctor | Backend + Infraestructura | Microservicios (orders, inventory, shipping, notification), Docker, PostgreSQL, Nginx |
+| `darlette` | Darlette | Frontend + Diseño | React SPA (inventario, pedidos, despachos), Landing Page Next.js, Tailwind CSS |
+
+**Flujo de trabajo por desarrollador:**
+```
+victor ──── feature/backend-xyz ──→ victor ──PR──→ develop ──→ main
+darlette ─ feature/frontend-xyz ─→ darlette ─PR──→ develop ──→ main
+```
+
+**Reglas:**
+- Cada desarrollador trabaja features en su propia rama (`victor` o `darlette`)
+- Para features colaborativas, crear `feature/*` desde `develop`
+- Merge a `develop` solo mediante Pull Request con review del otro desarrollador
+- Nunca pushear directo a `main` ni `develop`
+
 ---
 
 ## 2. Flujo de Trabajo
@@ -169,14 +190,21 @@ Cada push a cualquier rama ejecuta:
 ## 6. Diagrama de Flujo GitFlow
 
 ```
-                     v1.0.0            v1.0.1
-main  ────●───────────●────────────●────────────
-           \         /              \
-            \       /                \
-develop ──┬──●──┬──●──┬──────────┬──●────────
-           \    / \     \         /
-            ●──●   ●───● ●───────●
-           f1  f2  f3   f4       hotfix
+                              v1.0.0            v1.0.1
+main  ────────●───────────────●─────────────●────────────
+              ↑               ↑              ↑
+              │               │              │
+develop ──┬───●───┬───────┬───●──────────┬──●────────
+          │       │       │              │
+          │       │       │              │
+victor  ──●──┬────●───────●── ....       │
+             │    │                      │
+darlette ────●────●──────────────────────●── ....
+          f1   f2   f3                  hotfix
+
+Leyenda:
+  ● = merge / commit
+  → = PR review requerido
 ```
 
 ---
