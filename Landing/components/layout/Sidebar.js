@@ -4,7 +4,7 @@ export default function Sidebar({ openClass, handleMobileMenuClose }) {
     return (
         <div className={`fixed inset-0 z-[60] pointer-events-none ${openClass ? '' : 'hidden'}`}>
             <div className="absolute inset-0 bg-black/50 pointer-events-auto" onClick={handleMobileMenuClose}/>
-            <div className={`absolute top-0 right-0 w-80 h-full bg-white shadow-2xl pointer-events-auto transition-transform duration-300 ${openClass ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className={`absolute top-0 right-0 w-80 max-w-[85vw] h-full bg-white shadow-2xl pointer-events-auto transition-transform duration-300 ${openClass ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="flex flex-col h-full p-6">
                     <div className="flex items-center justify-between pb-5 border-b border-gray-200">
                         <Link href="/" onClick={handleMobileMenuClose}>
