@@ -74,7 +74,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -106,7 +106,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -139,7 +139,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -171,7 +171,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
