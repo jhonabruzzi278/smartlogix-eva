@@ -28,6 +28,32 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    networks:
+      - smartlogix-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # LocalStack ligero: solo SQS + SNS (fallback cuando no hay AWS real)
+  localstack:
+    image: localstack/localstack:4-slim
+    container_name: smartlogix-localstack
+    restart: unless-stopped
+    environment:
+      - SERVICES=sqs,sns
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    healthcheck:
+      test: ["CMD", "sh", "-c", "awslocal sqs list-queues >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
@@ -46,17 +72,21 @@ services:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://localhost:4566
-      - AWS_CLOUDWATCH_ENDPOINT=http://localhost:4566
+      - AWS_SQS_ENDPOINT=http://localstack:4566
+      - AWS_CLOUDWATCH_ENDPOINT=http://localstack:4566
       - ORDERS_QUEUE=orders-queue
       - SHIPPING_QUEUE=shipping-queue
       - CLOUDWATCH_LOG_GROUP=/smartlogix/orders-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
@@ -75,16 +105,20 @@ services:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://localhost:4566
-      - AWS_CLOUDWATCH_ENDPOINT=http://localhost:4566
+      - AWS_SQS_ENDPOINT=http://localstack:4566
+      - AWS_CLOUDWATCH_ENDPOINT=http://localstack:4566
       - SHIPPING_QUEUE=shipping-queue
       - CLOUDWATCH_LOG_GROUP=/smartlogix/inventory-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
@@ -103,17 +137,21 @@ services:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://localhost:4566
-      - AWS_CLOUDWATCH_ENDPOINT=http://localhost:4566
+      - AWS_SQS_ENDPOINT=http://localstack:4566
+      - AWS_CLOUDWATCH_ENDPOINT=http://localstack:4566
       - SHIPPING_QUEUE=shipping-queue
       - NOTIFICATION_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:notification-events-topic
       - CLOUDWATCH_LOG_GROUP=/smartlogix/shipping-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
@@ -132,16 +170,20 @@ services:
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://localhost:4566
-      - AWS_CLOUDWATCH_ENDPOINT=http://localhost:4566
+      - AWS_SQS_ENDPOINT=http://localstack:4566
+      - AWS_CLOUDWATCH_ENDPOINT=http://localstack:4566
       - NOTIFICATION_EVENTS_QUEUE=notification-events-queue
       - CLOUDWATCH_LOG_GROUP=/smartlogix/notification-service
       - CLOUDWATCH_LOG_STREAM=production
       - SPRING_PROFILES_ACTIVE=local-cloudwatch
-      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -noverify
+      - JAVA_TOOL_OPTIONS=-Xmx64m -Xms32m -XX:+UseSerialGC -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=16m -XX:+TieredCompilation -XX:TieredStopAtLevel=1
     depends_on:
       postgres-db:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
@@ -162,12 +204,18 @@ services:
       - inventory-service
       - shipping-service
       - notification-service
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
           memory: 32M
         reservations:
           memory: 16M
+
+networks:
+  smartlogix-net:
+    driver: bridge
 
 volumes:
   postgres_data:
