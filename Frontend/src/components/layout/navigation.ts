@@ -16,9 +16,9 @@ export const navItems: NavItem[] = [
   { title: "Punto de Venta", mobileTitle: "Vender", path: "/pos", icon: ShoppingCart, mobile: true, permission: "sales.create" },
   { title: "Inventario", mobileTitle: "Stock", path: "/inventory", icon: Boxes, mobile: true, permission: "inventory.view" },
   { title: "Pedidos", mobileTitle: "Pedidos", path: "/orders", icon: Package, mobile: true, permission: "orders.view" },
-  { title: "Clientes", mobileTitle: "Clientes", path: "/customers", icon: Users, mobile: true, permission: "orders.view" },
-  { title: "Envios", mobileTitle: "Envios", path: "/shipments", icon: Truck, mobile: true, permission: "shipments.view" },
-  { title: "Entregas", mobileTitle: "Entregas", path: "/deliveries", icon: Truck, mobile: true, permission: "shipments.update" },
+  { title: "Clientes", path: "/customers", icon: Users, permission: "orders.view" },
+  { title: "Envios", path: "/shipments", icon: Truck, permission: "shipments.view" },
+  { title: "Entregas", path: "/deliveries", icon: Truck, permission: "shipments.update" },
   { title: "Calendario", path: "/calendar", icon: Calendar, permission: "shipments.view" },
   { title: "Reportes", path: "/reports", icon: BarChart3, permission: "dashboard.view" },
   { title: "Usuarios", path: "/users", icon: ShieldCheck, permission: "users.view" }

@@ -1,6 +1,6 @@
-﻿import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Box, Check, Clock, History, Package, Truck, AlertTriangle } from "lucide-react";
+﻿import { useMemo, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Box, Check, Clock, History, Package, Trash2, Truck, AlertTriangle } from "lucide-react";
 import { managedUsers } from "@/app/user-directory";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
@@ -8,6 +8,7 @@ import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { buildOrderTimeline } from "@/lib/operational-insights";
 import { getOrderHistory } from "@/lib/order-history";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { ApiNotificationRecord, ApiOrder, ApiShipment } from "@/types/api";
 import type { Order, Shipment } from "@/types/domain";
 
@@ -16,6 +17,8 @@ const STAGE_LABELS = ["Recibido", "Preparación", "En reparto", "Entregado"];
 
 export function OrderDetailPage() {
   const { orderId } = useParams();
+  const navigate = useNavigate();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const { data: orders } = useApiQuery<ApiOrder[], Order[]>({
     path: "/api/orders", transform: (r) => r.map((o) => adaptOrder(o))
@@ -27,7 +30,7 @@ export function OrderDetailPage() {
     path: `/api/notifications/order/${orderId}`, transform: (r) => r, enabled: Boolean(orderId)
   });
 
-  const { operationalOrders, operationalShipments } = useOperationalWorkspace({ orders, shipments: shipment ? [shipment] : [] });
+  const { operationalOrders, operationalShipments, deleteOrder } = useOperationalWorkspace({ orders, shipments: shipment ? [shipment] : [] });
   const order = useMemo(() => operationalOrders.find((item) => item.id === orderId) ?? null, [operationalOrders, orderId]);
   const operationalShipment = useMemo(() => operationalShipments.find((item) => item.orderId === orderId) ?? null, [operationalShipments, orderId]);
   const historyEntries = useMemo(() => getOrderHistory(orderId ?? ""), [orderId]);
@@ -39,6 +42,12 @@ export function OrderDetailPage() {
   }, [order?.assignedTo]);
 
   const timeline = useMemo(() => buildOrderTimeline({ order, shipment: operationalShipment, notifications: notificationRecords }), [notificationRecords, operationalShipment, order]);
+
+  async function handleDelete() {
+    if (!order) return;
+    await deleteOrder(order.id);
+    navigate("/orders");
+  }
 
   if (!order) {
     return (
@@ -96,6 +105,15 @@ export function OrderDetailPage() {
         <span className={cn("self-start rounded-full px-3 py-1 text-xs font-bold", badgeClass())}>
           {badgeLabel()}
         </span>
+        {isCancelled && (
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            title="Eliminar pedido"
+            className="inline-flex items-center justify-center rounded-lg border border-red-200 min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Pipeline */}
@@ -108,7 +126,31 @@ export function OrderDetailPage() {
                 <div className="flex flex-col items-center flex-1">
                   <div className={cn("flex h-8 w-8 items-center justify-center rounded-full text-white text-xs", stageColor(i))}>
                     {i < currentStage ? <Check className="h-4 w-4" /> : i === currentStage ? <Clock className="h-4 w-4" /> : <span>{i + 1}</span>}
-                  </div>
+      {showDeleteModal && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <h3 className="font-bold text-sm text-[#112b4a]">Eliminar pedido #{order.id}</h3>
+              </div>
+              <button onClick={() => setShowDeleteModal(false)} className="p-1 rounded hover:bg-gray-100">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <p className="text-sm text-[#6B7280]">
+              Esta accion es irreversible. Se eliminara permanentemente el pedido de <strong>{order.customer}</strong> ({order.sku} x{order.quantity}).
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowDeleteModal(false)}>Volver</Button>
+              <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={handleDelete}>
+                Eliminar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
                   <p className={cn("mt-1.5 text-[10px] font-semibold text-center", i <= currentStage ? "text-[#112b4a]" : "text-[#6B7280]")}>{label}</p>
                 </div>
                 {i < 3 && <div className={cn("h-0.5 flex-1 -mt-5", i < currentStage ? "bg-[#4EB4A5]" : "bg-[#ECEEF0]")} />}

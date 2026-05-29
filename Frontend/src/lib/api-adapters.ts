@@ -118,7 +118,7 @@ export function adaptShipment(apiShipment: ApiShipment): Shipment {
 }
 
 export function adaptNotifications(records: ApiNotificationRecord[]): TimelineEvent[] {
-  return records
+  return (records ?? [])
     .slice()
     .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime())
     .map((record) => ({

@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/auth";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { getVisibleNavItems } from "@/components/layout/navigation";
@@ -40,15 +40,19 @@ export function AppShell() {
             </div>
             <nav className="space-y-1">
               {visibleItems.map((item) => (
-                <Link
+                <NavLink
                   key={item.path}
                   to={item.path}
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      isActive ? "bg-[#4B98CF] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                    }`
+                  }
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
                   {item.title}
-                </Link>
+                </NavLink>
               ))}
               <button
                 onClick={logout}

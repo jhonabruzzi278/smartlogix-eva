@@ -189,6 +189,10 @@ export function useOperationalWorkspace({
     }
   }
 
+  async function deleteOrder(orderId: string) {
+    await apiFetch(`/api/orders/${orderId}`, { method: "DELETE" });
+  }
+
   async function updateShipmentStage(shipment: Shipment, stage: ShipmentStage, _note?: string, proof?: { proofOfDeliveryImage?: string; recipientRut?: string; customerCode?: string }) {
     const body = proof ? JSON.stringify(proof) : undefined;
     await apiFetch(`/api/shipments/${shipment.id}/stage?stage=${stage}`, { method: "PUT", body });
@@ -211,5 +215,6 @@ export function useOperationalWorkspace({
     getAllSales: memoizedGetAllSales,
     addProduct,
     deleteProduct,
+    deleteOrder,
   };
 }

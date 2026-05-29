@@ -87,6 +87,15 @@ app.put('/api/orders/:id/assign', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to assign', err); }
 });
 
+app.delete('/api/orders/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM orders WHERE id=$1 RETURNING *', [req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Orden no encontrada' });
+    log.info('Order deleted', { orderId: req.params.id });
+    res.json({ message: 'Orden eliminada correctamente', order: result.rows[0] });
+  } catch (err) { sendError(res, 500, 'Failed to delete order', err); }
+});
+
 app.get('/api/customers', (_req, res) => res.json([]));
 
 (async () => { await ensureTables(); start(); })();

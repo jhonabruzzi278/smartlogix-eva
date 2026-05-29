@@ -72,7 +72,7 @@ export function buildOperationalAlerts({
       actionLabel: "Ver envios"
     }));
 
-  const notificationAlerts: AlertItem[] = notifications
+  const notificationAlerts: AlertItem[] = (notifications ?? [])
     .filter((record) => record.targetAudience.toUpperCase() === "OPERATOR" || record.status.toLowerCase().includes("error") || record.status.toLowerCase().includes("warn"))
     .map((record) => ({
       id: `notification-${record.id}`,

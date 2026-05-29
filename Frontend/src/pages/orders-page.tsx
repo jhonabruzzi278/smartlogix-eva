@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, FileUp, Plus, Search, Truck, User, X, AlertTriangle } from "lucide-react";
+import { Check, Download, FileUp, Plus, Search, Trash2, Truck, User, X, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/auth";
 import { managedUsers } from "@/app/user-directory";
@@ -40,6 +40,7 @@ export function OrdersPage() {
   const [assigningOrder, setAssigningOrder] = useState<string | null>(null);
   const [cancelModal, setCancelModal] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [deleteModal, setDeleteModal] = useState<Order | null>(null);
   const { can, role } = usePermissions();
   const { session } = useAuth();
   const canCreate = can("orders.create");
@@ -65,7 +66,7 @@ export function OrdersPage() {
 
   useAutoRefresh(() => { if (!loading && !cLoading) refresh(); }, 10000);
 
-  const { operationalOrders, validationQueue, confirmOrder, cancelOrder } = useOperationalWorkspace({ orders });
+  const { operationalOrders, validationQueue, confirmOrder, cancelOrder, deleteOrder } = useOperationalWorkspace({ orders });
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -96,6 +97,12 @@ export function OrdersPage() {
     addHistoryEntry({ orderId: order.id, action: "cancelled", actor: session?.name ?? "Admin", actorRole: role ?? "owner", detail: cancelReason });
     setCancelModal(null);
     setCancelReason("");
+    refresh();
+  }
+
+  async function handleDelete(order: Order) {
+    await deleteOrder(order.id);
+    setDeleteModal(null);
     refresh();
   }
 
@@ -417,11 +424,16 @@ export function OrdersPage() {
                        <button onClick={() => { setCancelModal(order); setCancelReason(""); }} title="Cancelar pedido" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
                      </div>
                    )}
-                   {canReview && order.stage === "en_preparación" && (
-                     <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                       <button onClick={() => { setCancelModal(order); setCancelReason(""); }} title="Cancelar pedido" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
-                     </div>
-                   )}
+                    {canReview && order.stage === "en_preparación" && (
+                      <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                        <button onClick={() => { setCancelModal(order); setCancelReason(""); }} title="Cancelar pedido" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+                      </div>
+                    )}
+                    {canReview && order.stage === "cancelado" && (
+                      <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                        <button onClick={() => setDeleteModal(order)} title="Eliminar pedido" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -461,6 +473,29 @@ export function OrdersPage() {
               <Button variant="outline" size="sm" onClick={() => { setCancelModal(null); setCancelReason(""); }}>Volver</Button>
               <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={() => handleCancel(cancelModal)} disabled={!cancelReason.trim()}>
                 Cancelar pedido
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeleteModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <h3 className="font-bold text-sm text-[#112b4a]">Eliminar pedido #{deleteModal.id}</h3>
+              </div>
+              <button onClick={() => setDeleteModal(null)} className="p-1 rounded hover:bg-gray-100"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="text-sm text-[#6B7280]">
+              Esta accion es irreversible. Se eliminara permanentemente el pedido de <strong>{deleteModal.customer}</strong> ({deleteModal.sku} x{deleteModal.quantity}).
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setDeleteModal(null)}>Volver</Button>
+              <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={() => handleDelete(deleteModal)}>
+                Eliminar
               </Button>
             </div>
           </div>

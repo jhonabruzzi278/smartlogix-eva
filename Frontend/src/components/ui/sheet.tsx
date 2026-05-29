@@ -16,14 +16,14 @@ export function Sheet({ open, onClose, title, description, side = "left", footer
     <>
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-foreground/30 transition-opacity md:hidden",
+          "fixed inset-0 z-40 bg-foreground/30 transition-opacity lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={onClose}
       />
       <aside
         className={cn(
-          "fixed inset-y-0 z-50 w-[88vw] max-w-sm border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-soft transition-transform md:hidden",
+          "fixed inset-y-0 z-50 w-[88vw] max-w-sm border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-soft transition-transform lg:hidden",
           side === "left" ? "left-0" : "right-0",
           open ? "translate-x-0" : side === "left" ? "-translate-x-full" : "translate-x-full"
         )}
