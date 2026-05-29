@@ -57,7 +57,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_SQS_ENDPOINT=http://sqs-mock:9324
       - ORDERS_QUEUE=orders-queue
-      - SHIPPING_QUEUE=shipping-queue
       - PORT=8081
     depends_on:
       postgres-db:

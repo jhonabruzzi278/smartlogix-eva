@@ -3,91 +3,138 @@ services:
     image: postgres:15-alpine
     container_name: smartlogix-db
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=admin123
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c effective_cache_size=64MB
+      -c maintenance_work_mem=16MB
+      -c wal_buffers=2MB
+      -c max_connections=50
+      -c work_mem=1MB
+      -c max_wal_size=128MB
+      -c min_wal_size=32MB
+      -c random_page_cost=1.1
+      -c max_worker_processes=2
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./Backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
-      retries: 10
+      retries: 5
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
+
+  sqs-mock:
+    image: softwaremill/elasticmq:latest
+    container_name: smartlogix-sqs-mock
+    restart: unless-stopped
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf
+    networks:
+      - smartlogix-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   orders-service:
-    image: jonahbruzzi/orders-service:latest
+    image: jonahbruzzi/orders-service:node
     container_name: smartlogix-orders
     restart: unless-stopped
     environment:
-      - DB_URL=jdbc:postgresql://postgres-db:5432/orders_db
-      - DB_USER=postgres
-      - DB_PASSWORD=admin123
-      - JAVA_TOOL_OPTIONS=-Xmx96m
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/orders_db
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_SQS_ENDPOINT=http://sqs-mock:9324
+      - ORDERS_QUEUE=orders-queue
+      - PORT=8081
     depends_on:
       postgres-db:
         condition: service_healthy
+      sqs-mock:
+        condition: service_started
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
 
   inventory-service:
-    image: jonahbruzzi/inventory-service:latest
+    image: jonahbruzzi/inventory-service:node
     container_name: smartlogix-inventory
     restart: unless-stopped
     environment:
-      - DB_URL=jdbc:postgresql://postgres-db:5432/inventory_db
-      - DB_USER=postgres
-      - DB_PASSWORD=admin123
-      - JAVA_TOOL_OPTIONS=-Xmx96m
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/inventory_db
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_SQS_ENDPOINT=http://sqs-mock:9324
+      - SHIPPING_QUEUE=shipping-queue
+      - PORT=8082
     depends_on:
       postgres-db:
         condition: service_healthy
+      sqs-mock:
+        condition: service_started
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
 
   shipping-service:
-    image: jonahbruzzi/shipping-service:latest
+    image: jonahbruzzi/shipping-service:node
     container_name: smartlogix-shipping
     restart: unless-stopped
     environment:
-      - DB_URL=jdbc:postgresql://postgres-db:5432/shipping_db
-      - DB_USER=postgres
-      - DB_PASSWORD=admin123
-      - JAVA_TOOL_OPTIONS=-Xmx96m
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/shipping_db
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_SQS_ENDPOINT=http://sqs-mock:9324
+      - SHIPPING_QUEUE=shipping-queue
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - PORT=8084
     depends_on:
       postgres-db:
         condition: service_healthy
+      sqs-mock:
+        condition: service_started
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
 
   notification-service:
-    image: jonahbruzzi/notification-service:latest
+    image: jonahbruzzi/notification-service:node
     container_name: smartlogix-notification
     restart: unless-stopped
     environment:
-      - DB_URL=jdbc:postgresql://postgres-db:5432/notification_db
-      - DB_USER=postgres
-      - DB_PASSWORD=admin123
-      - JAVA_TOOL_OPTIONS=-Xmx96m
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/notification_db
+      - PORT=8085
     depends_on:
       postgres-db:
         condition: service_healthy
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
 
   api-gateway:
     image: nginx:alpine
@@ -102,10 +149,16 @@ services:
       - inventory-service
       - shipping-service
       - notification-service
+    networks:
+      - smartlogix-net
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 32M
+
+networks:
+  smartlogix-net:
+    driver: bridge
 
 volumes:
   postgres_data:
