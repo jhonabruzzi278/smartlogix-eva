@@ -39,11 +39,6 @@ services:
     restart: unless-stopped
     volumes:
       - ./elasticmq.conf:/opt/elasticmq.conf
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9324"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - smartlogix-net
     deploy:
@@ -75,7 +70,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -106,7 +101,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -137,7 +132,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
