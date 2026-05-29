@@ -1,5 +1,6 @@
 # SmartLogix - Prueba automatica de todos los endpoints
-# Uso: powershell -ExecutionPolicy Bypass -File ENTREGABLE\test-backend.ps1
+# Compatible con PowerShell 5.1 y superior
+# Uso: .\ENTREGABLE\test-backend.ps1 -BaseUrl "http://104.248.60.29"
 param(
     [string]$BaseUrl = "http://localhost:80"
 )
@@ -11,29 +12,33 @@ $failed = 0
 function Test-Endpoint {
     param($Name, $Method, $Path, $Body, $ExpectedStatus = 200, $CheckProperty)
     try {
-        $headers = @{"Content-Type" = "application/json"}
-        $params = @{
-            Uri         = "$BaseUrl$Path"
-            Method      = $Method
-            ContentType = "application/json"
-            ErrorAction = "Stop"
+        $uri = "$BaseUrl$Path"
+        $bodyJson = if ($Body) { $Body | ConvertTo-Json -Compress } else { $null }
+
+        if ($bodyJson) {
+            $response = Invoke-WebRequest -Uri $uri -Method $Method -Body $bodyJson -ContentType "application/json" -UseBasicParsing -ErrorAction Stop
+        } else {
+            $response = Invoke-WebRequest -Uri $uri -Method $Method -ContentType "application/json" -UseBasicParsing -ErrorAction Stop
         }
-        if ($Body) {
-            $params.Body = ($Body | ConvertTo-Json -Compress)
+
+        Write-Host "  Status: $($response.StatusCode)" -ForegroundColor Gray
+        $body = $response.Content
+        Write-Host "  Body: $($body.Substring(0, [Math]::Min(120, $body.Length)))..." -ForegroundColor Gray
+
+        if ($CheckProperty) {
+            $obj = $body | ConvertFrom-Json
+            if ($obj -is [array]) { $obj = $obj[0] }
+            if ($obj.PSObject.Properties.Name -notcontains $CheckProperty) {
+                Write-Host "  [WARN] Propiedad '$CheckProperty' no encontrada" -ForegroundColor Yellow
+            }
         }
-        $response = Invoke-RestMethod @params -StatusCodeVariable statusCode
-        Write-Host "  Status: $statusCode" -ForegroundColor Gray
-        $result = $response | ConvertTo-Json -Depth 4 -Compress
-        Write-Host "  Body: $($result.Substring(0, [Math]::Min(120, $result.Length)))..." -ForegroundColor Gray
-        
-        $ok = $true
-        if ($CheckProperty -and $response.PSObject.Properties.Name -notcontains $CheckProperty) {
-            Write-Host "  [WARN] Propiedad '$CheckProperty' no encontrada" -ForegroundColor Yellow
-        }
+
         Write-Host "  [PASS] $Name" -ForegroundColor Green
         $script:passed++
-        return $response
+        return $body | ConvertFrom-Json
     } catch {
+        $statusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { "N/A" }
+        Write-Host "  Status: $statusCode" -ForegroundColor Gray
         Write-Host "  [FAIL] $Name : $($_.Exception.Message)" -ForegroundColor Red
         $script:failed++
         return $null
@@ -57,7 +62,7 @@ if ($inv -and $inv.Count -gt 0) {
     $sku = $inv[0].sku
     $stockAntes = $inv[0].stock
     Write-Host "  SKU de prueba: $sku (stock inicial: $stockAntes)" -ForegroundColor Gray
-    
+
     Test-Endpoint "Consultar SKU" "GET" "/api/inventory/$sku"
     Test-Endpoint "Ajustar +5" "POST" "/api/inventory/$sku/adjust?delta=5"
     Test-Endpoint "Ajustar -2" "POST" "/api/inventory/$sku/adjust?delta=-2"
@@ -66,24 +71,18 @@ if ($inv -and $inv.Count -gt 0) {
 # ── 3. Pedidos ──
 Write-Host "`n[3] PEDIDOS (CRUD)" -ForegroundColor Cyan
 
-# Crear
 $order1 = Test-Endpoint "Crear pedido" "POST" "/api/orders" -Body @{
     customerId = 1; sku = "100001"; quantity = 1
 } -CheckProperty "orderId"
 
-# Listar
 Test-Endpoint "Listar pedidos" "GET" "/api/orders" -CheckProperty "status"
 
-# Confirmar
 if ($order1 -and $order1.orderId) {
     $oid = $order1.orderId
     Test-Endpoint "Confirmar pedido" "PUT" "/api/orders/$oid/confirm" -CheckProperty "status"
-    
-    # Asignar transportista
     Test-Endpoint "Asignar transportista" "PUT" "/api/orders/$oid/assign?transporter=shipper01" -CheckProperty "assigned_to"
 }
 
-# Crear y cancelar
 $order2 = Test-Endpoint "Crear pedido 2 (cancelar)" "POST" "/api/orders" -Body @{
     customerId = 2; sku = "100002"; quantity = 1
 }
@@ -98,9 +97,7 @@ if ($order2 -and $order2.orderId) {
 
 # ── 4. Envios ──
 Write-Host "`n[4] ENVIOS" -ForegroundColor Cyan
-Test-Endpoint "Listar envios" "GET" "/api/shipments" -CheckProperty "tracking"
-
-$shipments = Test-Endpoint "Listar envios" "GET" "/api/shipments"
+$shipments = Test-Endpoint "Listar envios" "GET" "/api/shipments" -CheckProperty "tracking"
 if ($shipments -and $shipments.Count -gt 0) {
     $sid = $shipments[0].id
     Test-Endpoint "Avanzar a EN_REPARTO" "PUT" "/api/shipments/$sid/stage?stage=EN_REPARTO"
@@ -111,7 +108,7 @@ if ($shipments -and $shipments.Count -gt 0) {
 
 # ── 5. Notificaciones ──
 Write-Host "`n[5] NOTIFICACIONES / TRAZABILIDAD" -ForegroundColor Cyan
-Test-Endpoint "Trazabilidad orden 1" "GET" "/api/notifications/order/1" -CheckProperty "message"
+Test-Endpoint "Trazabilidad orden 1" "GET" "/api/notifications/order/1"
 
 # ── 6. Ventas ──
 Write-Host "`n[6] VENTAS" -ForegroundColor Cyan
