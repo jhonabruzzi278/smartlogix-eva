@@ -40,10 +40,10 @@ services:
     volumes:
       - ./elasticmq.conf:/opt/elasticmq.conf
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9324"]
+      test: ["CMD", "true"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 3
     networks:
       - smartlogix-net
     deploy:
@@ -63,6 +63,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/orders_db
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
@@ -78,14 +79,9 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-
   inventory-service:
     build:
       context: ./Backend
@@ -98,6 +94,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/inventory_db
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
@@ -112,7 +109,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -132,6 +129,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/shipping_db
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
@@ -146,7 +144,7 @@ services:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_healthy
+        condition: service_started
     networks:
       - smartlogix-net
     deploy:
@@ -166,6 +164,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
+      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/notification_db
       - SERVICE_NAME=notification-service
       - LOG_LEVEL=info
       - ALLOWED_ORIGINS=*
