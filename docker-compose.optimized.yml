@@ -33,12 +33,8 @@ services:
         limits:
           memory: 256M
 
-  sqs-mock:
-    image: softwaremill/elasticmq:1.6.7
-    container_name: smartlogix-sqs-mock
     restart: unless-stopped
     volumes:
-      - ./elasticmq.conf:/opt/elasticmq.conf
     networks:
       - smartlogix-net
     deploy:
@@ -55,11 +51,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
-      - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://sqs-mock:9324
-      - ORDERS_QUEUE=orders-queue
       - INVENTORY_SERVICE_URL=http://inventory-service:8082
       - SHIPPING_SERVICE_URL=http://shipping-service:8084
       - SERVICE_NAME=orders-service
@@ -69,7 +60,6 @@ services:
     depends_on:
       postgres-db:
         condition: service_healthy
-      sqs-mock:
         condition: service_started
     networks:
       - smartlogix-net
@@ -87,12 +77,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
-      - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://sqs-mock:9324
-      - SHIPPING_QUEUE=shipping-queue
-      - ORDERS_QUEUE=orders-queue
       - SERVICE_NAME=inventory-service
       - LOG_LEVEL=info
       - ALLOWED_ORIGINS=*
@@ -100,7 +84,6 @@ services:
     depends_on:
       postgres-db:
         condition: service_healthy
-      sqs-mock:
         condition: service_started
     networks:
       - smartlogix-net
@@ -118,11 +101,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
-      - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SQS_ENDPOINT=http://sqs-mock:9324
-      - SHIPPING_QUEUE=shipping-queue
       - NOTIFICATION_SERVICE_URL=http://notification-service:8085
       - SERVICE_NAME=shipping-service
       - LOG_LEVEL=info
@@ -131,7 +109,6 @@ services:
     depends_on:
       postgres-db:
         condition: service_healthy
-      sqs-mock:
         condition: service_started
     networks:
       - smartlogix-net

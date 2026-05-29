@@ -9,7 +9,6 @@
     "express-rate-limit": "^7.5.0",
     "pg": "^8.13.1",
     "uuid": "^11.0.5",
-    "cors": "^2.8.5",
-    "@aws-sdk/client-sqs": "^3.758.0"
+    "cors": "^2.8.5"
   }
 }

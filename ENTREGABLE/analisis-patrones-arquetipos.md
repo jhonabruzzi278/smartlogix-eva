@@ -36,7 +36,7 @@ function createPool(dbName) {
 
 **Problema que resuelve:** Cuando se confirma un pedido, se debe notificar a inventory (ajustar stock), shipping (crear envio) y notification (registrar evento) sin acoplamiento fuerte entre servicios.
 
-**Implementacion:** El patron Observer se implementa via llamadas REST encadenadas. orders-service actua como sujeto que notifica a los observadores (inventory, shipping) mediante HTTP. shipping-service a su vez notifica a notification-service.
+**Implementacion:** El patron Observer se implementa via llamadas REST directas entre servicios. orders-service actua como sujeto que notifica a los observadores (inventory, shipping) mediante HTTP. shipping-service a su vez notifica a notification-service.
 
 ```
 orders-service --REST--> inventory-service (ajusta stock)
@@ -50,7 +50,7 @@ await fetch(`${INVENTORY_URL}/api/inventory/${sku}/adjust?delta=-${qty}`);
 await fetch(`${SHIPPING_URL}/api/shipments`, { body: shipmentData });
 ```
 
-**Justificacion:** Desacopla servicios sin depender de brokers de mensajeria externos (SQS, Kafka). Cada servicio falla independientemente. Facil de extender: agregar un nuevo observer es agregar una llamada REST.
+**Justificacion:** Desacopla servicios sin depender de brokers de mensajeria externos. Cada servicio falla independientemente. Facil de extender: agregar un nuevo observer es agregar una llamada REST.
 
 ---
 
@@ -209,7 +209,7 @@ main
 
 ### 4.1 Codigo limpio y modular
 
-- **Separacion de concerns:** Cada servicio tiene `src/index.js` (rutas), `src/db.js` (datos), `src/sqs.js` (mensajeria)
+- **Separacion de concerns:** Cada servicio tiene `src/index.js` (rutas), modulos compartidos en `shared/` (db, logger, validate, shutdown)
 - **Modulos compartidos:** `Backend/shared/` contiene codigo reutilizado por los 4 servicios
 - **Validacion centralizada:** `shared/validate.js` con funciones de validacion por entidad
 - **Manejo de errores:** `try/catch` en cada handler, `sendError()` estandarizado
