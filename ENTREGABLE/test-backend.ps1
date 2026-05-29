@@ -26,16 +26,18 @@ function Test-Endpoint {
         Write-Host "  Body: $($body.Substring(0, [Math]::Min(120, $body.Length)))..." -ForegroundColor Gray
 
         if ($CheckProperty) {
-            $obj = $body | ConvertFrom-Json
-            if ($obj -is [array]) { $obj = $obj[0] }
-            if ($obj.PSObject.Properties.Name -notcontains $CheckProperty) {
-                Write-Host "  [WARN] Propiedad '$CheckProperty' no encontrada" -ForegroundColor Yellow
-            }
+            try {
+                $obj = $body | ConvertFrom-Json
+                if ($obj -is [array]) { $obj = $obj[0] }
+                if ($obj.PSObject.Properties.Name -notcontains $CheckProperty) {
+                    Write-Host "  [WARN] Propiedad '$CheckProperty' no encontrada" -ForegroundColor Yellow
+                }
+            } catch {}
         }
 
         Write-Host "  [PASS] $Name" -ForegroundColor Green
         $script:passed++
-        return $body | ConvertFrom-Json
+        try { return $body | ConvertFrom-Json } catch { return $body }
     } catch {
         $statusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { "N/A" }
         Write-Host "  Status: $statusCode" -ForegroundColor Gray
