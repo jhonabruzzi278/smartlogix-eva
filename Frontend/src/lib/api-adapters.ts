@@ -141,6 +141,6 @@ export function adaptCustomer(apiCustomer: ApiCustomer): Customer {
     phone: apiCustomer.phone ?? undefined,
     address: apiCustomer.address ?? undefined,
     email: apiCustomer.email ?? undefined,
-    createdAt: apiCustomer.createdAt ?? new Date().toISOString()
+    createdAt: apiCustomer.createdAt ?? (apiCustomer as Record<string, unknown>).created_at as string ?? new Date().toISOString()
   };
 }

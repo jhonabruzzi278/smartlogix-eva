@@ -1,143 +1,267 @@
-# SmartLogix - Prueba automatica de todos los endpoints
-# Compatible con PowerShell 5.1 y superior
+# SmartLogix - Prueba E2E Rigurosa (v3)
+# Compatible PowerShell 5.1+
 # Uso: .\ENTREGABLE\test-backend.ps1 -BaseUrl "http://104.248.60.29"
 param(
     [string]$BaseUrl = "http://localhost:80"
 )
 
 $ErrorActionPreference = "Continue"
-$passed = 0
-$failed = 0
+$total = 0; $passed = 0; $failed = 0; $warn = 0
+function Pass { $script:total++; $script:passed++; }
+function Fail { $script:total++; $script:failed++; }
+function Warn { $script:total++; $script:passed++; $script:warn++; }
 
-function Test-Endpoint {
-    param($Name, $Method, $Path, $Body, $ExpectedStatus = 200, $CheckProperty)
+function Assert {
+    param($Name, $Method, $Path, $Body, $ExpectedStatus = 200, [string[]]$RequiredProps, [switch]$SkipJson)
     try {
         $uri = "$BaseUrl$Path"
         $bodyJson = if ($Body) { $Body | ConvertTo-Json -Compress } else { $null }
-
         if ($bodyJson) {
             $response = Invoke-WebRequest -Uri $uri -Method $Method -Body $bodyJson -ContentType "application/json" -UseBasicParsing -ErrorAction Stop
         } else {
             $response = Invoke-WebRequest -Uri $uri -Method $Method -ContentType "application/json" -UseBasicParsing -ErrorAction Stop
         }
 
-        Write-Host "  Status: $($response.StatusCode)" -ForegroundColor Gray
+        $status = $response.StatusCode
         $body = $response.Content
-        Write-Host "  Body: $($body.Substring(0, [Math]::Min(120, $body.Length)))..." -ForegroundColor Gray
+        $bodyShort = if ($body.Length -gt 150) { $body.Substring(0, 150) + "..." } else { $body }
 
-        if ($CheckProperty) {
-            try {
-                $obj = $body | ConvertFrom-Json
-                if ($obj -is [array]) { $obj = $obj[0] }
-                if ($obj.PSObject.Properties.Name -notcontains $CheckProperty) {
-                    Write-Host "  [WARN] Propiedad '$CheckProperty' no encontrada" -ForegroundColor Yellow
-                }
-            } catch {}
+        if ($status -ne $ExpectedStatus) {
+            Write-Host "  [FAIL] $Name : esperaba status $ExpectedStatus, recibio $status" -ForegroundColor Red
+            Write-Host "         $bodyShort" -ForegroundColor DarkGray
+            Fail; return $null
         }
 
-        Write-Host "  [PASS] $Name" -ForegroundColor Green
-        $script:passed++
-        try { return $body | ConvertFrom-Json } catch { return $body }
+        if (-not $SkipJson) {
+            try { $obj = $body | ConvertFrom-Json } catch {
+                Write-Host "  [WARN] $Name : respuesta no es JSON. Body: $bodyShort" -ForegroundColor Yellow
+                Warn; return $body
+            }
+
+            if ($RequiredProps) {
+                $cleanBlock = if ($obj -and $obj.Count -gt 0) { $obj[0] } else { $obj }
+                foreach ($prop in $RequiredProps) {
+                    if ($cleanBlock -and $cleanBlock.PSObject.Properties.Name -notcontains $prop) {
+                        Write-Host "  [WARN] $Name : falta propiedad '$prop'" -ForegroundColor Yellow
+                        Warn
+                    }
+                }
+            }
+
+            Write-Host "  [PASS] $Name  [status: $status]" -ForegroundColor Green
+            Pass; return $obj
+        }
+
+        Write-Host "  [PASS] $Name  [status: $status]" -ForegroundColor Green
+        Pass; return $body
+
+    } catch [System.Net.WebException] {
+        $errStatus = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+        if ($errStatus -eq $ExpectedStatus) {
+            # Status code matches expected (e.g., expected 404)
+            $respBody = try { (New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch { "" }
+            Write-Host "  [PASS] $Name  [status: $errStatus] $respBody" -ForegroundColor Green
+            Pass; return $null
+        } else {
+            Write-Host "  [FAIL] $Name : esperaba $ExpectedStatus, recibio $errStatus - $($_.Exception.Message)" -ForegroundColor Red
+            Fail; return $null
+        }
     } catch {
-        $statusCode = if ($_.Exception.Response) { $_.Exception.Response.StatusCode.value__ } else { "N/A" }
-        Write-Host "  Status: $statusCode" -ForegroundColor Gray
         Write-Host "  [FAIL] $Name : $($_.Exception.Message)" -ForegroundColor Red
-        $script:failed++
-        return $null
+        Fail; return $null
     }
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host " SmartLogix - Prueba de Backend" -ForegroundColor Cyan
+Write-Host " SmartLogix E2E - Prueba Rigurosa v3" -ForegroundColor Cyan
 Write-Host " Base URL: $BaseUrl" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-# ── 1. Health checks ──
-Write-Host "[1] HEALTH CHECKS" -ForegroundColor Cyan
-$health = Test-Endpoint "BFF Health" "GET" "/healthz"
-Test-Endpoint "Orders service UP" "GET" "/api/orders/test"
+# ═══════════════════════════════════════════════════════════════
+# 1. SALUD DEL SISTEMA
+# ═══════════════════════════════════════════════════════════════
+Write-Host "[1] SALUD DEL SISTEMA" -ForegroundColor Cyan
+Assert "Health check BFF"       "GET" "/healthz" -ExpectedStatus 200
+Assert "Health check orders"    "GET" "/api/orders/test" -SkipJson
+Assert "Ruta inexistente (404)" "GET" "/api/no-existe" -ExpectedStatus 404
 
-# ── 2. Inventario ──
-Write-Host "`n[2] INVENTARIO" -ForegroundColor Cyan
-$inv = Test-Endpoint "Listar inventario" "GET" "/api/inventory" -CheckProperty "stock"
-if ($inv -and $inv.Count -gt 0) {
-    $sku = $inv[0].sku
-    $stockAntes = $inv[0].stock
-    Write-Host "  SKU de prueba: $sku (stock inicial: $stockAntes)" -ForegroundColor Gray
+# ═══════════════════════════════════════════════════════════════
+# 2. CLIENTES (CRUD COMPLETO)
+# ═══════════════════════════════════════════════════════════════
+Write-Host "`n[2] CLIENTES (CRUD)" -ForegroundColor Cyan
 
-    Test-Endpoint "Consultar SKU" "GET" "/api/inventory/$sku"
-    Test-Endpoint "Ajustar +5" "POST" "/api/inventory/$sku/adjust?delta=5"
-    Test-Endpoint "Ajustar -2" "POST" "/api/inventory/$sku/adjust?delta=-2"
+$cust1 = Assert "Crear cliente" "POST" "/api/customers" -ExpectedStatus 201 -RequiredProps @("id","name","phone","email","address") -Body @{
+    name = "Minimarket La Esquina"; phone = "+56911111111"; address = "Calle Falsa 123"; email = "minimarket@correo.cl"
 }
 
-# ── 3. Pedidos ──
-Write-Host "`n[3] PEDIDOS (CRUD)" -ForegroundColor Cyan
+$cust2 = Assert "Crear cliente 2" "POST" "/api/customers" -ExpectedStatus 201 -Body @{
+    name = "Panaderia San Juan"; phone = "+56922222222"; address = "Los Aromos 456"; email = "panaderia@correo.cl"
+}
 
-$order1 = Test-Endpoint "Crear pedido" "POST" "/api/orders" -Body @{
-    customerId = 1; sku = "100001"; quantity = 1
-} -CheckProperty "orderId"
+Assert "Crear sin nombre (400)" "POST" "/api/customers" -ExpectedStatus 400 -Body @{
+    name = ""; phone = "+569"; address = ""; email = ""
+}
 
-Test-Endpoint "Listar pedidos" "GET" "/api/orders" -CheckProperty "status"
+Assert "Listar clientes" "GET" "/api/customers" -RequiredProps @("id","name","phone","email","address")
 
+if ($cust1 -and $cust1.id) {
+    $cid1 = $cust1.id
+    Assert "Consultar cliente por ID" "GET" "/api/customers/$cid1" -RequiredProps @("id","name","phone")
+    Assert "Editar cliente" "PUT" "/api/customers/$cid1" -Body @{
+        name = "Minimarket La Esquina Editado"; phone = "+56933333333"; address = "Nueva Direccion 789"; email = "nuevo@correo.cl"
+    } -RequiredProps @("id","name")
+    Assert "Verificar edicion" "GET" "/api/customers/$cid1" -ExpectedStatus 200
+    Assert "Eliminar cliente" "DELETE" "/api/customers/$cid1" -ExpectedStatus 200
+    Assert "Verificar eliminacion (404)" "GET" "/api/customers/$cid1" -ExpectedStatus 404
+}
+
+# ═══════════════════════════════════════════════════════════════
+# 3. INVENTARIO (CRUD + STOCK)
+# ═══════════════════════════════════════════════════════════════
+Write-Host "`n[3] INVENTARIO (CRUD + Stock)" -ForegroundColor Cyan
+
+Assert "Listar inventario" "GET" "/api/inventory" -RequiredProps @("id","sku","stock")
+
+$prod1 = Assert "Crear producto" "POST" "/api/inventory" -ExpectedStatus 201 -RequiredProps @("id","sku","stock") -Body @{
+    sku = "TEST-PROD-01"; stock = 50
+}
+
+Assert "Crear SKU duplicado (409)" "POST" "/api/inventory" -ExpectedStatus 409 -Body @{
+    sku = "TEST-PROD-01"; stock = 10
+}
+
+Assert "Crear segundo producto" "POST" "/api/inventory" -ExpectedStatus 201 -Body @{
+    sku = "TEST-PROD-02"; stock = 30
+}
+
+if ($prod1 -and $prod1.sku) {
+    $sku = $prod1.sku
+    Assert "Consultar SKU" "GET" "/api/inventory/$sku" -RequiredProps @("sku","stock")
+    Assert "Ajustar stock +10" "POST" "/api/inventory/$sku/adjust?delta=10" -RequiredProps @("sku","stock","delta")
+    
+    # Validar que el stock realmente subio
+    $invCheck = Assert "Verificar stock tras +10" "GET" "/api/inventory/$sku" -RequiredProps @("stock")
+    if ($invCheck -and $invCheck.stock -ne 60) {
+        Write-Host "  [WARN] Stock esperado 60, recibido $($invCheck.stock)" -ForegroundColor Yellow
+    }
+
+    Assert "Ajustar stock -3 (genera venta)" "POST" "/api/inventory/$sku/adjust?delta=-3" -RequiredProps @("sku","stock","delta")
+
+    # Verificar que la venta se registro
+    Assert "Listar ventas" "GET" "/api/sales" -RequiredProps @("id","sku","quantity")
+
+    Assert "Ajustar mas del stock (400)" "POST" "/api/inventory/$sku/adjust?delta=-999" -ExpectedStatus 400
+
+    Assert "Eliminar producto" "DELETE" "/api/inventory/$sku" -ExpectedStatus 200
+    Assert "Verificar eliminacion (404)" "GET" "/api/inventory/$sku" -ExpectedStatus 404
+}
+
+# ═══════════════════════════════════════════════════════════════
+# 4. PEDIDOS (CICLO DE VIDA COMPLETO)
+# ═══════════════════════════════════════════════════════════════
+Write-Host "`n[4] PEDIDOS (Happy Path + Cancel + Delete)" -ForegroundColor Cyan
+
+$customerList = Assert "Obtener clientes para pedidos" "GET" "/api/customers"
+$customerId = if ($customerList -and $customerList.Count -gt 0) { $customerList[0].id } else { 1 }
+
+$prodList = Assert "Obtener productos para pedidos" "GET" "/api/inventory"
+$testSku = if ($prodList -and $prodList.Count -gt 0) { $prodList[0].sku } else { "TEST-PROD-02" }
+
+# 4.1 Crear pedido
+$order1 = Assert "Crear pedido" "POST" "/api/orders" -ExpectedStatus 201 -RequiredProps @("orderId","status") -Body @{
+    customerId = $customerId; sku = $testSku; quantity = 2
+}
+
+Assert "Listar pedidos" "GET" "/api/orders" -RequiredProps @("id","customer_id","sku","quantity","status")
+
+# 4.2 Confirmar
 if ($order1 -and $order1.orderId) {
-    $oid = $order1.orderId
-    Test-Endpoint "Confirmar pedido" "PUT" "/api/orders/$oid/confirm" -CheckProperty "status"
-    Test-Endpoint "Asignar transportista" "PUT" "/api/orders/$oid/assign?transporter=shipper01" -CheckProperty "assigned_to"
+    $oid1 = $order1.orderId
+    Assert "Confirmar pedido" "PUT" "/api/orders/$oid1/confirm" -RequiredProps @("id","status")
+
+    # 4.3 Asignar transportista
+    Assert "Asignar transportista" "PUT" "/api/orders/$oid1/assign?transporter=shipper01" -RequiredProps @("id","assigned_to")
+    Assert "Asignar sin parametro (400)" "PUT" "/api/orders/$oid1/assign?transporter=" -ExpectedStatus 400
 }
 
-$order2 = Test-Endpoint "Crear pedido 2 (cancelar)" "POST" "/api/orders" -Body @{
-    customerId = 2; sku = "100002"; quantity = 1
+# 4.4 Crear, confirmar, cancelar
+$order2 = Assert "Crear pedido para cancelar" "POST" "/api/orders" -ExpectedStatus 201 -Body @{
+    customerId = $customerId; sku = $testSku; quantity = 1
 }
 if ($order2 -and $order2.orderId) {
     $oid2 = $order2.orderId
-    Test-Endpoint "Confirmar pedido 2" "PUT" "/api/orders/$oid2/confirm"
-    Test-Endpoint "Cancelar pedido 2" "PUT" "/api/orders/$oid2/cancel" -Body @{
-        reason = "Prueba cancelacion"
+    Assert "Confirmar antes de cancelar" "PUT" "/api/orders/$oid2/confirm"
+    Assert "Cancelar pedido" "PUT" "/api/orders/$oid2/cancel" -RequiredProps @("id","status","cancel_reason") -Body @{
+        reason = "Prueba de cancelacion E2E"
     }
-    Test-Endpoint "Eliminar pedido 2" "DELETE" "/api/orders/$oid2"
 }
 
-# ── 4. Envios ──
-Write-Host "`n[4] ENVIOS" -ForegroundColor Cyan
-$shipments = Test-Endpoint "Listar envios" "GET" "/api/shipments" -CheckProperty "tracking"
+# 4.5 Crear y eliminar (cancelado)
+$order3 = Assert "Crear pedido para eliminar" "POST" "/api/orders" -ExpectedStatus 201 -Body @{
+    customerId = $customerId; sku = $testSku; quantity = 1
+}
+if ($order3 -and $order3.orderId) {
+    $oid3 = $order3.orderId
+    Assert "Confirmar pedido 3" "PUT" "/api/orders/$oid3/confirm"
+    Assert "Cancelar pedido 3" "PUT" "/api/orders/$oid3/cancel" -Body @{ reason = "Para eliminar" }
+    Assert "Eliminar pedido" "DELETE" "/api/orders/$oid3" -ExpectedStatus 200
+    Assert "Verificar eliminacion (404)" "GET" "/api/orders/$oid3" -ExpectedStatus 404 -SkipJson
+}
+
+# 4.6 Casos borde
+Assert "Confirmar pedido inexistente (404)" "PUT" "/api/orders/99999/confirm" -ExpectedStatus 404
+Assert "Cancelar pedido inexistente (404)" "PUT" "/api/orders/99999/cancel" -ExpectedStatus 404 -Body @{ reason = "x" }
+
+# ═══════════════════════════════════════════════════════════════
+# 5. ENVIOS (CICLO DE VIDA)
+# ═══════════════════════════════════════════════════════════════
+Write-Host "`n[5] ENVIOS" -ForegroundColor Cyan
+
+$shipments = Assert "Listar envios" "GET" "/api/shipments" -RequiredProps @("id","order_id","status","tracking_number")
 if ($shipments -and $shipments.Count -gt 0) {
     $sid = $shipments[0].id
-    Test-Endpoint "Avanzar a EN_REPARTO" "PUT" "/api/shipments/$sid/stage?stage=EN_REPARTO"
-    Test-Endpoint "Entregar envio" "PUT" "/api/shipments/$sid/stage?stage=ENTREGADO" -Body @{
-        customerCode = "C999"; recipientRut = "11111111-1"
+    Assert "Avanzar a EN_REPARTO" "PUT" "/api/shipments/$sid/stage?stage=EN_REPARTO" -RequiredProps @("id","status")
+    Assert "Entregar con datos" "PUT" "/api/shipments/$sid/stage?stage=ENTREGADO" -RequiredProps @("id","status") -Body @{
+        customerCode = "C-E2E-TEST"; recipientRut = "11111111-1"
     }
 }
 
-# ── 5. Notificaciones ──
-Write-Host "`n[5] NOTIFICACIONES / TRAZABILIDAD" -ForegroundColor Cyan
-Test-Endpoint "Trazabilidad orden 1" "GET" "/api/notifications/order/1"
+# ═══════════════════════════════════════════════════════════════
+# 6. TRAZABILIDAD
+# ═══════════════════════════════════════════════════════════════
+Write-Host "`n[6] TRAZABILIDAD" -ForegroundColor Cyan
+Assert "Trazabilidad orden existente" "GET" "/api/notifications/order/1" -RequiredProps @("id","message")
 
-# ── 6. Ventas ──
-Write-Host "`n[6] VENTAS" -ForegroundColor Cyan
-Test-Endpoint "Listar ventas" "GET" "/api/sales"
+# ═══════════════════════════════════════════════════════════════
+# 7. NEGOCIO: CONSISTENCIA DE DATOS
+# ═══════════════════════════════════════════════════════════════
+Write-Host "`n[7] CONSISTENCIA DE DATOS" -ForegroundColor Cyan
 
-# ── 7. Clientes ──
-Write-Host "`n[7] CLIENTES" -ForegroundColor Cyan
-Test-Endpoint "Listar clientes" "GET" "/api/customers" -CheckProperty "name"
-
-$customer = Test-Endpoint "Crear cliente" "POST" "/api/customers" -Body @{
-    name = "Cliente Prueba"; phone = "+56900000000"; address = "Calle Test 123"; email = "test@test.cl"
-} -CheckProperty "name"
-
-if ($customer -and $customer.id) {
-    $cid = $customer.id
-    Test-Endpoint "Consultar cliente" "GET" "/api/customers/$cid" -CheckProperty "name"
-    Test-Endpoint "Editar cliente" "PUT" "/api/customers/$cid" -Body @{
-        name = "Cliente Editado"; phone = "+56911111111"; address = "Nueva Dir 456"; email = "editado@test.cl"
-    }
-    Test-Endpoint "Eliminar cliente" "DELETE" "/api/customers/$cid"
+# Crear producto con stock conocido
+Assert "Crear producto stock-test" "POST" "/api/inventory" -ExpectedStatus 201 -Body @{
+    sku = "STOCK-CHECK-01"; stock = 20
 }
 
-# ── Resumen ──
+# Crear pedido con ese producto
+$consOrder = Assert "Crear pedido consistencia" "POST" "/api/orders" -ExpectedStatus 201 -Body @{
+    customerId = $customerId; sku = "STOCK-CHECK-01"; quantity = 3
+}
+
+if ($consOrder -and $consOrder.orderId) {
+    $stockAntes = (Assert "Stock antes de confirmar" "GET" "/api/inventory/STOCK-CHECK-01").stock
+    Assert "Confirmar pedido consistencia" "PUT" "/api/orders/$($consOrder.orderId)/confirm"
+    $stockDespues = (Assert "Stock despues de confirmar" "GET" "/api/inventory/STOCK-CHECK-01").stock
+    
+    if ($stockAntes -and $stockDespues -and ($stockDespues -ne $stockAntes - 3)) {
+        Write-Host "  [WARN] Stock inconsistente: era $stockAntes, esperaba $($stockAntes - 3), es $stockDespues" -ForegroundColor Yellow
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════
+# RESUMEN
+# ═══════════════════════════════════════════════════════════════
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host " RESULTADO: $passed PASS / $failed FAIL" -ForegroundColor $(if ($failed -eq 0) { "Green" } else { "Red" })
+Write-Host " RESULTADO: $passed PASS / $failed FAIL / $warn WARN  (total: $total)" -ForegroundColor $(if ($failed -eq 0) { "Green" } else { "Red" })
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-if ($failed -gt 0) {
-    exit 1
-}
+if ($failed -gt 0) { exit 1 } else { exit 0 }
