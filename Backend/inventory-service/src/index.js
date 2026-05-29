@@ -105,6 +105,17 @@ app.put('/api/inventory/:sku', async (req, res) => {
   }
 });
 
+app.delete('/api/inventory/:sku', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM inventory WHERE sku = $1 RETURNING *', [req.params.sku]);
+    if (!result.rows.length) return res.status(404).json({ error: 'SKU no encontrado' });
+    log.info('Product deleted', { sku: req.params.sku });
+    res.json({ deleted: true, sku: req.params.sku });
+  } catch (err) {
+    sendError(res, 500, 'Failed to delete inventory', err);
+  }
+});
+
 app.post('/api/inventory/:sku/adjust', async (req, res) => {
   try {
     const delta = parseInt(req.query.delta, 10);
