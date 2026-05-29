@@ -1,36 +1,26 @@
-﻿import { useEffect, useState } from "react";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+﻿import { useCallback, useEffect, useState } from "react";
 
 export function usePwaInstall() {
-  const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [canInstall, setCanInstall] = useState(false);
 
   useEffect(() => {
-    const handler = (event: Event) => {
-      event.preventDefault();
-      setPromptEvent(event as BeforeInstallPromptEvent);
-    };
-
+    function handler(e: Event) {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setCanInstall(true);
+    }
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  async function install() {
-    if (!promptEvent) {
-      return false;
+  const promptInstall = useCallback(async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setCanInstall(false);
     }
+  }, [deferredPrompt]);
 
-    await promptEvent.prompt();
-    const choice = await promptEvent.userChoice;
-    setPromptEvent(null);
-    return choice.outcome === "accepted";
-  }
-
-  return {
-    canInstall: Boolean(promptEvent),
-    install
-  };
+  return { canInstall, promptInstall };
 }

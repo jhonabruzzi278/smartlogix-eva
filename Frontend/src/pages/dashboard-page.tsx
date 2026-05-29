@@ -1,35 +1,10 @@
-import { useMemo, useEffect, useState } from "react";
-// Hook para manejar el evento de instalación PWA
-function usePwaInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [canInstall, setCanInstall] = useState(false);
-
-  useEffect(() => {
-    function handler(e: any) {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setCanInstall(true);
-    }
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  const promptInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === "accepted") setCanInstall(false);
-    }
-  };
-
-  return { canInstall, promptInstall };
-}
-import { ArrowRight, Banknote, Boxes, Bell, Clock, Package, ShoppingBag, ShoppingCart, Truck } from "lucide-react";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
+import { ArrowRight, Banknote, Boxes, Bell, ShoppingBag, ShoppingCart, Truck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/auth";
 import { getRoleProfile } from "@/app/access";
-import { fallbackAlerts } from "@/data/mock-data";
 import { useApiQuery } from "@/hooks/use-api-query";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { adaptInventory, adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { buildOperationalAlerts } from "@/lib/operational-insights";
@@ -45,7 +20,7 @@ const quickActions = [
 ];
 
 export function DashboardPage() {
-  const { canInstall, promptInstall } = usePwaInstallPrompt();
+  const { canInstall, promptInstall } = usePwaInstall();
   const { session } = useAuth();
   const navigate = useNavigate();
   const profile = session ? getRoleProfile(session.role) : null;
@@ -62,18 +37,25 @@ export function DashboardPage() {
 
   const loading = ordersLoading || inventoryLoading || shipmentsLoading;
 
-  const { operationalOrders, operationalInventory, operationalShipments, validationQueue, stockQueue, getAllSales } = useOperationalWorkspace({ orders, inventory, shipments });
+  const workspaceInput = useMemo(() => ({
+    orders: orders ?? [],
+    inventory: inventory ?? [],
+    shipments: shipments ?? []
+  }), [orders, inventory, shipments]);
+
+  const { operationalOrders, operationalInventory, operationalShipments, validationQueue, stockQueue, getAllSales } = useOperationalWorkspace(workspaceInput);
 
   const alerts = useMemo<AlertItem[]>(() => {
-    const derived = buildOperationalAlerts({ orders: operationalOrders, inventory: operationalInventory, shipments: operationalShipments, notifications: [] });
-    return derived.length > 0 ? derived : fallbackAlerts;
+    return buildOperationalAlerts({ orders: operationalOrders, inventory: operationalInventory, shipments: operationalShipments, notifications: [] });
   }, [operationalInventory, operationalOrders, operationalShipments]);
 
   const [allSales, setAllSales] = useState<Sale[]>([]);
+  const getAllSalesRef = useRef(getAllSales);
+  getAllSalesRef.current = getAllSales;
 
   useEffect(() => {
-    getAllSales().then(setAllSales).catch(() => setAllSales([]));
-  }, [getAllSales]);
+    getAllSalesRef.current().then(setAllSales).catch(() => setAllSales([]));
+  }, []);
 
   const todaySales = useMemo(() => {
     const today = new Date();
@@ -96,7 +78,7 @@ export function DashboardPage() {
 
   if (!session) return null;
 
-  if (loading && orders?.length === 0 && inventory?.length === 0 && shipments?.length === 0) {
+  if (loading && !orders && !inventory && !shipments) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="text-center">

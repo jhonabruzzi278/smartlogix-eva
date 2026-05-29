@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { Order, Product, ProductCategory, Sale, Shipment, ShipmentStage } from "@/types/domain";
 import { apiFetch } from "@/lib/api-client";
 
@@ -162,6 +162,8 @@ export function useOperationalWorkspace({
     }
   }
 
+  const memoizedGetAllSales = useCallback(getAllSales, []);
+
   async function confirmOrder(order: Order) {
     await apiFetch(`/api/orders/${order.id}/confirm`, { method: "PUT" });
   }
@@ -206,7 +208,7 @@ export function useOperationalWorkspace({
     adjustInventory,
     updateShipmentStage,
     recordSale,
-    getAllSales,
+    getAllSales: memoizedGetAllSales,
     addProduct,
     deleteProduct,
   };

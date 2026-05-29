@@ -1,12 +1,30 @@
 const express = require('express');
 const cors = require('cors');
-const pool = require('./db');
+const rateLimit = require('express-rate-limit');
+const { createPool } = require('../shared/db');
+const log = require('../shared/logger');
+const { validateNotificationBody } = require('../shared/validate');
+const { gracefulShutdown } = require('../shared/shutdown');
 
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*';
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+app.use(cors({
+  origin: ALLOWED_ORIGINS === '*' ? '*' : ALLOWED_ORIGINS.split(',').map(s => s.trim()),
+  credentials: true,
+}));
+app.use(express.json({ limit: '1mb' }));
+
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+}));
 
 const PORT = process.env.PORT || 8085;
+const pool = createPool('notification_db');
 
 async function ensureTables() {
   await pool.query(`
@@ -24,13 +42,8 @@ async function ensureTables() {
       received_at TIMESTAMP DEFAULT NOW()
     )
   `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_notification_order_id ON notification_records (order_id)
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_notification_audience ON notification_records (target_audience)
-  `);
-  // Unique constraint to avoid duplicates
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_notification_order_id ON notification_records (order_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_notification_audience ON notification_records (target_audience)`);
   await pool.query(`
     DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_notification_event_audience') THEN
@@ -40,13 +53,19 @@ async function ensureTables() {
   `);
 }
 
-// POST /api/notifications
+function sendError(res, status, logMessage, err) {
+  log.warn(logMessage, { error: err?.message || String(err) });
+  res.status(status).json({ error: status >= 500 ? 'Internal server error' : (err?.message || 'Request failed') });
+}
+
 app.post('/api/notifications', async (req, res) => {
   try {
     const event = req.body;
+    const errors = validateNotificationBody(event);
+    if (errors.length) return res.status(400).json({ error: errors.join(', ') });
+
     const audience = event.audience || 'BOTH';
 
-    // Check for duplicate
     const existing = await pool.query(
       'SELECT id FROM notification_records WHERE event_id = $1 AND target_audience = $2',
       [event.eventId, audience]
@@ -63,18 +82,16 @@ app.post('/api/notifications', async (req, res) => {
        event.message, audience, event.sourceService, event.occurredAt]
     );
 
-    console.log(`Notification persisted: ${event.stage} order=${event.orderId}`);
+    log.info('Notification persisted', { stage: event.stage, orderId: event.orderId });
     res.status(202).json({ status: 'ACCEPTED', eventId: event.eventId });
   } catch (err) {
     if (err.code === '23505') {
       return res.status(202).json({ status: 'DUPLICATE', eventId: req.body.eventId });
     }
-    console.error('Error persisting notification:', err.message);
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'Failed to persist notification', err);
   }
 });
 
-// GET /api/notifications/order/:orderId
 app.get('/api/notifications/order/:orderId', async (req, res) => {
   try {
     const result = await pool.query(
@@ -83,28 +100,39 @@ app.get('/api/notifications/order/:orderId', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'Failed to get notifications', err);
   }
 });
 
-// GET /api/notifications/audience/:audience
 app.get('/api/notifications/audience/:audience', async (req, res) => {
   try {
+    const audience = req.params.audience.toUpperCase();
+    if (!['CLIENT', 'OPERATOR', 'BOTH'].includes(audience)) {
+      return res.status(400).json({ error: 'audience must be CLIENT, OPERATOR, or BOTH' });
+    }
     const result = await pool.query(
       'SELECT * FROM notification_records WHERE target_audience = $1 ORDER BY occurred_at DESC',
-      [req.params.audience.toUpperCase()]
+      [audience]
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'Failed to get notifications', err);
+  }
+});
+
+app.get('/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'UP', db: 'connected' });
+  } catch {
+    res.status(503).json({ status: 'DEGRADED', db: 'disconnected' });
   }
 });
 
 async function start() {
   await ensureTables();
-  app.listen(PORT, () => console.log(`notification-service running on port ${PORT}`));
+  const server = app.listen(PORT, () => log.info(`notification-service running on port ${PORT}`));
+  gracefulShutdown(server, pool, null, 'notification-service');
 }
-
-app.get('/health', (_req, res) => res.json({ status: 'UP' }));
 
 start();
