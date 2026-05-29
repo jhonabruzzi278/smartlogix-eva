@@ -3,7 +3,7 @@ function validateOrderBody(body) {
   if (!body || !body.customerId) errors.push('customerId es requerido');
   if (!body || !body.sku) errors.push('sku es requerido');
   if (!body || !body.quantity || body.quantity < 1) errors.push('quantity debe ser >= 1');
-  if (errors.length) throw Object.assign(new Error(errors.join(', ')), { status: 400, errors });
+  return errors;
 }
 
 function validateOrderStatus(status) {

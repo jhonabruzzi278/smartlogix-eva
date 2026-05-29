@@ -21,7 +21,7 @@ app.use(rateLimit({
   windowMs: 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false, validate: { xForwardedForHeader: false },
   message: { error: 'Too many requests, please try again later' },
 }));
 
