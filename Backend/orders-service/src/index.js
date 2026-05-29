@@ -236,6 +236,10 @@ app.put('/api/orders/:id/assign', async (req, res) => {
   }
 });
 
+app.get('/api/customers', async (_req, res) => {
+  res.json([]);
+});
+
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
