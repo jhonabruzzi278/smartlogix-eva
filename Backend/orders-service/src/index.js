@@ -12,6 +12,9 @@ async function ensureTables() {
     id SERIAL PRIMARY KEY, customer_id INTEGER NOT NULL, sku VARCHAR(100) NOT NULL,
     quantity INTEGER NOT NULL, status VARCHAR(30) DEFAULT 'CREATED',
     created_at TIMESTAMP DEFAULT NOW(), assigned_to VARCHAR(100), cancel_reason VARCHAR(255))`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS customers (
+    id SERIAL PRIMARY KEY, name VARCHAR(200) NOT NULL, phone VARCHAR(30),
+    address VARCHAR(300), email VARCHAR(200), created_at TIMESTAMP DEFAULT NOW())`);
 }
 
 app.get('/api/orders/test', (_req, res) => res.send('orders-service UP'));
@@ -96,6 +99,48 @@ app.delete('/api/orders/:id', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to delete order', err); }
 });
 
-app.get('/api/customers', (_req, res) => res.json([]));
+app.get('/api/customers', async (_req, res) => {
+  try { res.json((await pool.query('SELECT * FROM customers ORDER BY name')).rows); }
+  catch (err) { sendError(res, 500, 'Failed to list customers', err); }
+});
+
+app.get('/api/customers/:id', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT * FROM customers WHERE id=$1', [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.json(r.rows[0]);
+  } catch (err) { sendError(res, 500, 'Failed to get customer', err); }
+});
+
+app.post('/api/customers', async (req, res) => {
+  try {
+    const { name, phone, address, email } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
+    const c = (await pool.query(
+      'INSERT INTO customers (name, phone, address, email) VALUES ($1,$2,$3,$4) RETURNING *',
+      [name.trim(), phone || null, address || null, email || null])).rows[0];
+    res.status(201).json(c);
+  } catch (err) { sendError(res, 500, 'Failed to create customer', err); }
+});
+
+app.put('/api/customers/:id', async (req, res) => {
+  try {
+    const { name, phone, address, email } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
+    const r = await pool.query(
+      'UPDATE customers SET name=$1, phone=$2, address=$3, email=$4 WHERE id=$5 RETURNING *',
+      [name.trim(), phone || null, address || null, email || null, req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.json(r.rows[0]);
+  } catch (err) { sendError(res, 500, 'Failed to update customer', err); }
+});
+
+app.delete('/api/customers/:id', async (req, res) => {
+  try {
+    const r = await pool.query('DELETE FROM customers WHERE id=$1 RETURNING *', [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.json({ message: 'Cliente eliminado correctamente' });
+  } catch (err) { sendError(res, 500, 'Failed to delete customer', err); }
+});
 
 (async () => { await ensureTables(); start(); })();

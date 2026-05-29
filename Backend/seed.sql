@@ -23,8 +23,22 @@ INSERT INTO inventory (sku, stock)
 SELECT 'MOUSE-LOGI', 80
 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE sku = 'MOUSE-LOGI');
 
--- 2. PEDIDOS: uno en cada estado del flujo --------------------
+-- 2. CLIENTES -------------------------------------------------
 \c orders_db
+
+INSERT INTO customers (id, name, phone, address, email, created_at)
+SELECT 1, 'Distribuidora El Sol', '+56912345678', 'Av. Providencia 1234, Santiago', 'ventas@elsol.cl', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM customers WHERE id = 1);
+
+INSERT INTO customers (id, name, phone, address, email, created_at)
+SELECT 2, 'Comercial Andina Ltda', '+56987654321', 'Calle Los Olivos 567, Maipu', 'contacto@andina.cl', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM customers WHERE id = 2);
+
+INSERT INTO customers (id, name, phone, address, email, created_at)
+SELECT 3, 'Importadora Pacifico', '+56911223344', 'Av. Las Condes 890, Las Condes', 'info@pacifico.cl', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM customers WHERE id = 3);
+
+-- 3. PEDIDOS: uno en cada estado del flujo --------------------
 
 -- Cliente 1: pedido pendiente de confirmacion
 INSERT INTO orders (id, customer_id, sku, quantity, status, created_at)

@@ -118,7 +118,20 @@ Test-Endpoint "Listar ventas" "GET" "/api/sales"
 
 # ── 7. Clientes ──
 Write-Host "`n[7] CLIENTES" -ForegroundColor Cyan
-Test-Endpoint "Listar clientes" "GET" "/api/customers"
+Test-Endpoint "Listar clientes" "GET" "/api/customers" -CheckProperty "name"
+
+$customer = Test-Endpoint "Crear cliente" "POST" "/api/customers" -Body @{
+    name = "Cliente Prueba"; phone = "+56900000000"; address = "Calle Test 123"; email = "test@test.cl"
+} -CheckProperty "name"
+
+if ($customer -and $customer.id) {
+    $cid = $customer.id
+    Test-Endpoint "Consultar cliente" "GET" "/api/customers/$cid" -CheckProperty "name"
+    Test-Endpoint "Editar cliente" "PUT" "/api/customers/$cid" -Body @{
+        name = "Cliente Editado"; phone = "+56911111111"; address = "Nueva Dir 456"; email = "editado@test.cl"
+    }
+    Test-Endpoint "Eliminar cliente" "DELETE" "/api/customers/$cid"
+}
 
 # ── Resumen ──
 Write-Host "`n========================================" -ForegroundColor Cyan
