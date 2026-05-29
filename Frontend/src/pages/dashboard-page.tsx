@@ -103,7 +103,7 @@ export function DashboardPage() {
         </div>
       )}
       {/* Header */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[1.2px] text-muted-foreground">Don Juan / Bebidas y Confites</p>
           <h1 className="text-xl font-bold text-foreground">Buenos dias, {session.name.split(" ")[0]}</h1>
