@@ -1,71 +1,72 @@
-﻿# Repositorios del Proyecto SmartLogix
+Repositorio principal del proyecto SmartLogix
+=============================================
 
-## Repositorio Principal
-https://github.com/JONAHBRUZZI/smartlogix
+Enlace: https://github.com/JONAHBRUZZI/smartlogix
 
-Contiene el proyecto completo SmartLogix:
-- Frontend/ — Aplicacion SPA React + Vite + TypeScript (NPM)
-- Backend/ — 4 microservicios Node.js + BFF Nginx + PostgreSQL
-- ENTREGABLE/ — Documentacion (analisis patrones, plan branching, repositorios)
-- Docker Compose — Orquestacion multi-contenedor
+Este repositorio contiene la plataforma completa de gestion logistica SmartLogix.
+Incluye el frontend React (SPA + PWA), los 4 microservicios backend (Node.js/Express),
+la configuracion del BFF (Nginx API Gateway) y los archivos Docker Compose para
+despliegue en VM.
 
----
 
-## Componentes
+Descripcion de cada componente dentro del repositorio:
+------------------------------------------------------
 
-### Frontend (NPM)
-- **Ubicación:** Frontend/
-- **Descripción:** SPA con React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, PWA
-- **Ejecutar:** `npm install && npm run dev`
-- **Build:** `npm run build`
-- **Deploy:** Vercel (https://smartlogix-five.vercel.app)
+1. Frontend (React SPA)
+   Ruta en el repo: /Frontend/
+   Tecnologia: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui + PWA
+   Descripcion: Aplicacion web progresiva (PWA) para la gestion de pedidos,
+   inventario, envios, punto de venta, clientes y reportes.
+   Deploy: Vercel (https://smartlogix-five.vercel.app)
 
-### Backend For Frontend (BFF)
-- **Ubicación:** Backend/nginx/
-- **Descripción:** Nginx como API Gateway, reverse proxy y BFF
-- **Puerto:** 80
-- **Funcion:** Enruta peticiones del frontend a los 4 microservicios
+2. BFF - API Gateway (Nginx)
+   Ruta en el repo: /Backend/nginx/
+   Tecnologia: Nginx Alpine
+   Descripcion: Reverse proxy que actua como punto unico de entrada a los
+   microservicios. Enruta /api/orders, /api/inventory, /api/shipments y
+   /api/notifications al servicio correspondiente.
 
-### Microservicio: orders-service
-- **Puerto:** 8081
-- **Base de datos:** orders_db
-- **Responsabilidad:** CRUD de pedidos, confirmacion, cancelacion, asignacion
-- **Imagen Docker:** jonahbruzzi/orders-service:node
+3. orders-service (Microservicio de Pedidos)
+   Ruta en el repo: /Backend/orders-service/
+   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
+   Puerto: 8081 | Base de datos: orders_db
+   Descripcion: Gestiona el ciclo de vida de los pedidos: creacion, confirmacion
+   (orquesta inventory + shipping), cancelacion, asignacion de transportista y
+   eliminacion.
 
-### Microservicio: inventory-service
-- **Puerto:** 8082
-- **Base de datos:** inventory_db
-- **Responsabilidad:** Control de stock, ajustes, ventas, alertas
-- **Imagen Docker:** jonahbruzzi/inventory-service:node
+4. inventory-service (Microservicio de Inventario)
+   Ruta en el repo: /Backend/inventory-service/
+   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
+   Puerto: 8082 | Base de datos: inventory_db
+   Descripcion: Control de stock, catalogo de productos, ajustes atomicos de
+   inventario y registro de ventas.
 
-### Microservicio: shipping-service
-- **Puerto:** 8084
-- **Base de datos:** shipping_db
-- **Responsabilidad:** Envíos, tracking, código QR, confirmacion de entrega
-- **Imagen Docker:** jonahbruzzi/shipping-service:node
+5. shipping-service (Microservicio de Envios)
+   Ruta en el repo: /Backend/shipping-service/
+   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
+   Puerto: 8084 | Base de datos: shipping_db
+   Descripcion: Gestion de envios, generacion de numeros de tracking, control de
+   etapas de despacho y notificacion de cambios al notification-service.
 
-### Microservicio: notification-service
-- **Puerto:** 8085
-- **Base de datos:** notification_db
-- **Responsabilidad:** Persistencia y consulta de eventos de trazabilidad
-- **Imagen Docker:** jonahbruzzi/notification-service:node
+6. notification-service (Microservicio de Trazabilidad)
+   Ruta en el repo: /Backend/notification-service/
+   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
+   Puerto: 8085 | Base de datos: notification_db
+   Descripcion: Persistencia de eventos para trazabilidad y auditoria. Registra
+   cada cambio de estado en el flujo logistico.
 
----
 
-## Infraestructura
+Infraestructura:
+----------------
+- Docker Compose (desarrollo y produccion)
+- PostgreSQL 15 Alpine (1 base de datos por microservicio)
+- Docker Hub (imagenes pre-build para despliegue en VM)
+- Vercel (hosting del frontend)
+- VM DigitalOcean (hosting del backend en 104.248.60.29)
 
-### Docker Compose
-- **node.yml:** Desarrollo con build local
-- **vm.yml:** Producción con imagenes pre-built
-- **optimized.yml:** Optimizado para 1GB RAM
-- **prod.yml:** Producción completo
 
-### Docker Hub
-- https://hub.docker.com/r/jonahbruzzi/orders-service
-- https://hub.docker.com/r/jonahbruzzi/inventory-service
-- https://hub.docker.com/r/jonahbruzzi/shipping-service
-- https://hub.docker.com/r/jonahbruzzi/notification-service
-
-### VM Producción
-- **IP:** 104.248.60.29
-- **Stack:** Docker Compose + Nginx + Node.js + PostgreSQL
+Documentacion de entregables (rubrica):
+----------------------------------------
+- /ENTREGABLE/analisis-patrones-arquetipos.md
+- /ENTREGABLE/plan-branching.md
+- /ENTREGABLE/repositorios.txt (este archivo)

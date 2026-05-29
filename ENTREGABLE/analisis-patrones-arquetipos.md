@@ -1,250 +1,165 @@
-﻿# Análisis de Patrones de Diseño y Arquetipos Arquitectónicos
+# Analisis de Patrones de Diseno y Arquetipos
 
-**Proyecto:** SmartLogix
-**Equipo:** Jonah Bruzzi
-**Stack:** Node.js 22 + Express + PostgreSQL + Nginx
-**Fecha:** Mayo 2026
+**Proyecto:** SmartLogix - Plataforma de Gestion Logistica
+**Arquitectura:** Microservicios con BFF (Backend For Frontend)
 
 ---
 
-## 1. Patrones de Diseño Implementados
+## 1. Patron BFF (Backend For Frontend)
 
-### 1.1 Patron Repository (Backend - 4 microservicios)
+### Que es
+El patron BFF consiste en un API Gateway que actua como intermediario entre el frontend y los microservicios. En lugar de que el frontend conozca las URL de cada microservicio, todas las peticiones pasan por un unico punto de entrada.
 
-**Ubicación:** `Backend/shared/db.js` y cada `src/index.js`
+### Implementacion en SmartLogix
+- **Componente:** Nginx actuando como reverse proxy
+- **Archivo:** `Backend/nginx/nginx.conf`
+- **Puerto:** 80
 
-**Problema que resuelve:** Separar la logica de acceso a datos de la logica de negocio. Sin un patron Repository, las consultas SQL estarian dispersas en los handlers HTTP, dificultando el mantenimiento y las pruebas.
+### Justificacion
+- **Desacoplamiento:** El frontend solo conoce una URL base (`/api/*`). Si cambia la ubicacion o el puerto de un microservicio, solo se actualiza el BFF.
+- **Seguridad:** Punto unico para aplicar CORS, rate limiting y headers de seguridad.
+- **Simplicidad del frontend:** El cliente React solo llama a `/api/orders`, `/api/inventory`, etc., sin preocuparse de puertos.
+- **Salud centralizada:** Endpoint `/healthz` permite monitorear todo el sistema desde un solo punto.
 
-**Implementación:** El modulo `shared/db.js` exporta una funcion `createPool(dbName)` que configura un pool de conexiones PostgreSQL usando `pg`. Cada microservicio importa este modulo y ejecuta consultas parametrizadas. Las tablas se crean automáticamente con `CREATE TABLE IF NOT EXISTS` en la funcion `ensureTables()`.
-
-```javascript
-// shared/db.js
-const { Pool } = require('pg');
-function createPool(dbName) {
-  const url = process.env.DB_URL || `postgresql://user:pass@host/${dbName}`;
-  return new Pool({ connectionString: url, max: 3 });
-}
+### Rutas configuradas
 ```
-
-**Justificación:** Encapsula la configuración de conexion. Si se cambia de PostgreSQL a otro motor, solo se modifica `db.js`. El pool de 3 conexiones mantiene bajo consumo de recursos.
+/api/orders        -> orders-service:8081
+/api/customers     -> orders-service:8081
+/api/inventory     -> inventory-service:8082
+/api/sales         -> inventory-service:8082
+/api/shipments     -> shipping-service:8084
+/api/notifications -> notification-service:8085
+```
 
 ---
 
-### 1.2 Patron Observer / Event-Driven (via REST)
+## 2. Patron de Microservicios (Descomposicion por Dominio)
 
-**Ubicación:** orders-service, shipping-service, notification-service
+### Que es
+Cada microservicio es dueño de su propio dominio de negocio y base de datos. No comparten tablas ni estado entre si. La comunicacion es via API REST.
 
-**Problema que resuelve:** Cuando se confirma un pedido, se debe notificar a inventory (ajustar stock), shipping (crear envío) y notification (registrar evento) sin acoplamiento fuerte entre servicios.
+### Implementacion en SmartLogix
 
-**Implementación:** El patron Observer se implementa via llamadas REST directas entre servicios. orders-service actua como sujeto que notifica a los observadores (inventory, shipping) mediante HTTP. shipping-service a su vez notifica a notification-service.
+| Microservicio | Dominio | Base de datos propia |
+|--------------|---------|---------------------|
+| orders-service | Gestion de pedidos | orders_db |
+| inventory-service | Control de stock y ventas | inventory_db |
+| shipping-service | Envios y tracking | shipping_db |
+| notification-service | Trazabilidad y auditoria | notification_db |
 
-```
-orders-service --REST--> inventory-service (ajusta stock)
-orders-service --REST--> shipping-service (crea envío)
-shipping-service --REST--> notification-service (registra evento)
-```
-
-```javascript
-// orders-service: confirmar orden -> notifica observers via REST
-await fetch(`${INVENTORY_URL}/api/inventory/${sku}/adjust?delta=-${qty}`);
-await fetch(`${SHIPPING_URL}/api/shipments`, { body: shipmentData });
-```
-
-**Justificación:** Desacopla servicios sin depender de brokers de mensajeria externos. Cada servicio falla independientemente. Facil de extender: agregar un nuevo observer es agregar una llamada REST.
+### Justificacion
+- **Aislamiento:** Un fallo en shipping-service no impide crear pedidos.
+- **Escalabilidad independiente:** inventory-service puede escalarse mas si hay alta demanda de consultas de stock.
+- **Despliegue independiente:** Se puede actualizar notification-service sin detener los demas.
+- **Base de datos por servicio:** Cada servicio tiene su propia BD, evitando acoplamiento a nivel de datos.
 
 ---
 
-### 1.3 Patron Factory Method (Creacion de servicios)
+## 3. Patron Saga (Coreografia)
 
-**Ubicación:** `Backend/shared/` y cada `src/index.js`
+### Que es
+En una arquitectura de microservicios, una operacion de negocio que abarca varios servicios se coordina mediante una secuencia de llamadas. SmartLogix usa el enfoque de **orquestacion** (un servicio coordina a los demas).
 
-**Problema que resuelve:** Cada microservicio necesita una instancia única de pool de BD, logger, y configuración de Express sin repetir código de inicializacion.
+### Implementacion en SmartLogix
 
-**Implementación:** Los modulos compartidos (`shared/db.js`, `shared/logger.js`, `shared/validate.js`, `shared/shutdown.js`) exportan funciones factory que cada servicio invoca para crear sus dependencias.
+El flujo de confirmacion de un pedido (`PUT /api/orders/:id/confirm`) es una saga orquestada por orders-service:
 
-```javascript
-const pool = createPool('orders_db');        // Factory: crea pool para orders
-const log = require('../shared/logger');      // Singleton: logger compartido
+```
+orders-service recibe PUT /confirm
+  │
+  ├──[1]──> inventory-service: POST /adjust?delta=-N
+  │           (Descuenta stock del producto)
+  │
+  ├──[2]──> shipping-service: POST /shipments
+  │           (Crea envio con tracking)
+  │           │
+  │           └──> notification-service: POST /notifications
+  │                   (Registra evento de creacion)
+  │
+  └──[3]──> Actualiza estado a EN_PREPARACION
 ```
 
-**Justificación:** Evita duplicacion de código entre los 4 microservicios. Si se cambia la configuración de BD, se modifica un solo archivo. Facilita pruebas unitarias al permitir inyeccion de dependencias mock.
+Si falla el ajuste de inventario, el proceso se detiene con errores acumulados y se reportan al cliente.
+
+### Justificacion
+- **Trazabilidad:** Cada paso queda registrado en notification-service.
+- **Manejo de errores parciales:** Si un paso falla, los errores se acumulan y se informan sin detener los pasos que si funcionan.
+- **Simplicidad:** No requiere un bus de mensajes ni colas SQS/SNS. REST sincrono es suficiente para el volumen de este sistema.
 
 ---
 
-### 1.4 Patron Adapter (Frontend)
+## 4. Patron Repository (Acceso a Datos)
 
-**Ubicación:** `Frontend/src/lib/api-adapters.ts`
+### Que es
+Abstrae el acceso a la base de datos detras de funciones reutilizables, evitando que la logica de negocio contenga consultas SQL directas.
 
-**Problema que resuelve:** Los datos que vienen de la API REST (snake_case, tipos planos) no coinciden con el modelo de dominio del frontend (camelCase, tipos enriquecidos).
+### Implementacion en SmartLogix
+- **Modulo compartido:** `Backend/shared/db.js` proporciona una fabrica de pools PostgreSQL.
+- **Abstraccion:** `createApp(dbName, port)` en `shared/app.js` encapsula la creacion del pool y la configuracion de Express.
+- **Transacciones:** Cada microservicio ejecuta queries SQL directamente con `pool.query()`, pero todas usan el mismo pool configurado por el modulo compartido.
 
-**Implementación:** El modulo `api-adapters.ts` transforma las respuestas de la API al modelo del frontend:
-
-```typescript
-export function adaptOrder(raw: ApiOrder): Order {
-  return {
-    id: raw.id,
-    customerId: raw.customer_id,
-    sku: raw.sku,
-    quantity: raw.quantity,
-    status: raw.status,
-  };
-}
-```
-
-**Justificación:** Aisla los cambios de API del resto de la aplicacion. Si el backend cambia el formato de respuesta, solo se modifica el adapter.
+### Justificacion
+- **DRY:** Los 4 microservicios comparten el mismo codigo de conexion y configuracion.
+- **Pool de conexiones:** Evita crear/destruir conexiones por cada peticion.
+- **Configuracion centralizada:** Variables de entorno iguales para todos los servicios.
 
 ---
 
-### 1.5 Patron Proxy (Frontend - API Client)
+## 5. Patron Observer / Notificacion
 
-**Ubicación:** `Frontend/src/lib/api-client.ts`
+### Que es
+Cuando ocurre un evento en un servicio, se notifica a otro servicio interesado sin que el emisor necesite conocer los detalles del receptor.
 
-**Problema que resuelve:** Centralizar todas las llamadas HTTP, manejo de errores, autenticacion y headers en un solo lugar.
+### Implementacion en SmartLogix
+- **Emisor:** shipping-service notifica cambios de etapa
+- **Receptor:** notification-service persiste el evento para trazabilidad
 
-**Implementación:** `api-client.ts` proporciona funciones `get`, `post`, `put` que envuelven `fetch` con manejo de errores estandarizado, headers comunes, y transformacion de respuestas.
-
-```typescript
-export async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`);
-  if (!res.ok) throw new ApiRequestError(res.status, await res.text());
-  return res.json();
-}
-```
-
-**Justificación:** Si se cambia de fetch a axios, solo se modifica este archivo. Manejo de errores consistente en toda la app. Facil de mockear en pruebas.
+### Justificacion
+- **Auditabilidad:** Cada cambio de estado queda registrado con timestamp, servicio origen y audiencia destino.
+- **Idempotencia:** El notification-service evita duplicados mediante restriccion UNIQUE en `(event_id, target_audience)`.
 
 ---
 
-## 2. Arquetipos y Patrones Arquitectónicos
+## 6. Arquetipo de Microservicio Node.js/Express
 
-### 2.1 Microservicios con Database per Service
+SmartLogix define un **arquetipo reutilizable** para todos sus microservicios:
 
-**Problema que resuelve:** Un sistema monolitico con una sola base de datos crea acoplamiento en el esquema, dificulta el escalado independiente y convierte cualquier cambio de schema en un riesgo global.
+### Estructura base
+```
+servicio/
+├── Dockerfile              # Node.js 22 Alpine, copia shared/ + src/
+├── package.json            # express, pg, helmet, cors, rate-limit
+└── src/
+    └── index.js            # createApp(), rutas REST, ensureTables(), start()
+```
 
-**Implementación:** 4 bases de datos independientes, una por cada bounded context:
+### Arquetipo compartido (shared/)
+```
+shared/
+├── app.js       # Fabrica de apps Express
+├── db.js        # Pool PostgreSQL
+├── logger.js    # Logging estructurado
+├── security.js  # Helmet + CORS + Rate limiting
+├── validate.js  # Validacion de entradas
+└── shutdown.js  # Apagado graceful
+```
 
-| Servicio | Base de datos | Responsabilidad |
-|----------|--------------|----------------|
-| orders-service | orders_db | Pedidos |
-| inventory-service | inventory_db | Stock y ventas |
-| shipping-service | shipping_db | Envíos y tracking |
-| notification-service | notification_db | Trazabilidad |
+### Como crear un nuevo microservicio usando el arquetipo
 
-Cada servicio crea sus propias tablas al iniciar (`CREATE TABLE IF NOT EXISTS`).
-
-**Justificación:** Aislamiento total entre servicios. Cada equipo puede modificar su esquema sin afectar a otros. Permite escalar y optimizar cada BD segun necesidades del servicio.
+1. Copiar cualquier microservicio existente como plantilla
+2. Cambiar `package.json` > `name`
+3. Ajustar `index.js`: nombre de BD, puerto, rutas
+4. Agregar al `docker-compose.yml` y `nginx.conf`
 
 ---
 
-### 2.2 API Gateway / Backend For Frontend (BFF)
+## Resumen de patrones
 
-**Problema que resuelve:** Exponer 4 microservicios en diferentes puertos al frontend crearia complejidad de CORS, multiples dominios, y logica de routing en el cliente.
-
-**Implementación:** Nginx actua como API Gateway en puerto 80, enrutando por path:
-
-```nginx
-location /api/orders      -> orders-service:8081
-location /api/inventory   -> inventory-service:8082
-location /api/sales       -> inventory-service:8082
-location /api/shipments   -> shipping-service:8084
-location /api/notifications -> notification-service:8085
-location /api/customers   -> orders-service:8081
-```
-
-**Justificación:** Punto único de entrada. Oculta topologia interna. Permite agregar rate limiting, autenticacion y CORS en un solo lugar. Facilita el versionado de API.
-
----
-
-### 2.3 Saga Pattern (Orquestacion de Pedidos)
-
-**Problema que resuelve:** El proceso "crear pedido -> validar stock -> confirmar -> generar despacho -> notificar" es una transaccion distribuida entre 4 servicios con bases de datos independientes. No se puede usar ACID tradicional.
-
-**Implementación:** Saga orquestada donde orders-service es el coordinador:
-
-```
-1. orders-service: crea pedido en orders_db (status=CREATED)
-2. orders-service: PUT /confirm dispara la saga
-   a. REST -> inventory-service: ajusta stock (-quantity)
-   b. REST -> shipping-service: crea envío + tracking
-      c. REST -> notification-service: persiste evento SHIPMENT_CREATED
-3. orders-service: actualiza status a EN_PREPARACION
-```
-
-Si algun paso falla, el warning se registra y el flujo continua (eventual consistency). Para cancelaciones, se ejecuta la compensacion inversa (restaurar stock).
-
-**Justificación:** Garantiza la consistencia eventual del negocio sin bloquear servicios. Cada paso es independiente y trazable.
-
----
-
-## 3. Estrategia de Branching (GitFlow Adaptado)
-
-### Ramas principales
-
-| Rama | Proposito |
-|------|----------|
-| `main` | Código en produccion. Cada commit es deployable. |
-| `develop` | Integración de features. (Simplificado: usamos main directamente por ser equipo pequeño) |
-
-### Flujo de trabajo
-
-```
-main
-  ├── feature/sns-to-rest     # Reemplazo SNS por REST
-  ├── feature/nodejs-migration # Migracion Java a Node.js
-  ├── feature/swagger-api      # Documentacion OpenAPI
-  ├── fix/elasticmq-healthcheck # Fix healthcheck compose
-  ├── fix/db-url-ports         # Correccion DB_URL y puertos
-  └── refactor/remove-sqs      # Eliminacion de SQS/elasticmq
-```
-
-### Evidencia de merges y resolucion de conflictos
-
-- Commit `befadc1`: Merge conflict en docker-compose.node.yml resuelto
-- Commit `ce35a41`: Merge con vite.config.ts generado
-- Todos los merges documentados en `git log --merges`
-
----
-
-## 4. Buenas Practicas y Pruebas
-
-### 4.1 Código limpio y modular
-
-- **Separacion de concerns:** Cada servicio tiene `src/index.js` (rutas), modulos compartidos en `shared/` (db, logger, validate, shutdown)
-- **Modulos compartidos:** `Backend/shared/` contiene código reutilizado por los 4 servicios
-- **Validacion centralizada:** `shared/validate.js` con funciones de validacion por entidad
-- **Manejo de errores:** `try/catch` en cada handler, `sendError()` estandarizado
-- **Logging estructurado:** Timestamps ISO 8601, nivel de log configurable
-
-### 4.2 Health checks
-
-Todos los servicios exponen `GET /health`:
-```json
-{"status": "UP", "db": "connected"}
-```
-
-Docker HEALTHCHECK en cada Dockerfile usando `wget` contra el endpoint.
-
-### 4.3 Idempotencia
-
-- notification-service: constraint `UNIQUE(event_id, target_audience)` evita duplicados
-- inventory-service: tabla `processed_events` con PRIMARY KEY (event_type, event_key)
-- Manejo de `ON CONFLICT DO NOTHING` en INSERTs
-
-### 4.4 Contenedores optimizados
-
-- Imagenes Alpine (~100 MB vs ~428 MB Java)
-- Pool de conexiones limitado a 3 por servicio
-- Rate limiting via `express-rate-limit` (200 req/min)
-- Graceful shutdown con `SIGTERM`/`SIGINT`
-
-### 4.5 Pruebas (Frontend)
-
-El frontend incluye tests con Vitest:
-```bash
-cd Frontend && npm test
-```
-
-Archivos de prueba:
-- `src/hooks/__tests__/use-api-query.test.tsx`
-- `src/lib/__tests__/api-adapters.test.ts`
-- `src/lib/__tests__/api-client.test.ts`
+| Patron | Proposito | Donde se usa |
+|--------|----------|-------------|
+| BFF | API Gateway unico | Nginx reverse proxy |
+| Microservicios | Dominios independientes | 4 servicios con BD propia |
+| Saga (orquestacion) | Flujo de negocio multi-servicio | orders-service al confirmar |
+| Repository | Acceso a datos abstraido | shared/db.js + shared/app.js |
+| Observer | Notificacion de eventos | shipping -> notification |
+| Arquetipo | Plantilla reutilizable | shared/ + Dockerfile + package.json |

@@ -1,68 +1,65 @@
-﻿# SmartLogix - Plataforma de Gestión Logística
+﻿# SmartLogix - Plataforma de Gestion Logistica
 
-**Repositorio:** https://github.com/JONAHBRUZZI/smartlogix
-**VM:** http://104.248.60.29
-**Frontend:** https://smartlogix-five.vercel.app
+**Repositorio principal:** https://github.com/JONAHBRUZZI/smartlogix
+**Backend (VM):** http://104.248.60.29
+**Frontend (Vercel):** https://smartlogix-five.vercel.app
 
 ---
 
 ## Arquitectura
 
 ```
-┌────────────────────────────────────────────────────┐
-│ Frontend (React + Vite)    Vercel / :3000          │
-├────────────────────────────────────────────────────┤
-│ API Gateway (Nginx BFF)    :80                     │
-├──────────┬──────────┬──────────┬───────────────────┤
-│ orders   │ inventory│ shipping │ notification      │
-│ Node.js  │ Node.js  │ Node.js  │ Node.js           │
-│ :8081    │ :8082    │ :8084    │ :8085             │
-├──────────┴──────────┴──────────┴───────────────────┤
-│ PostgreSQL 15 (4 bases independientes)             │
-└────────────────────────────────────────────────────┘
++----------------------------------------------+
+| Frontend (React + Vite)    Vercel / :3000     |
++----------------------------------------------+
+| API Gateway / BFF (Nginx)  :80                |
++----------+-----------+-----------+-----------+
+| orders   | inventory | shipping  | notif.    |
+| Node.js  | Node.js   | Node.js   | Node.js   |
+| :8081    | :8082     | :8084     | :8085     |
++----------+-----------+-----------+-----------+
+| PostgreSQL 15 (4 bases independientes)        |
++----------------------------------------------+
 ```
 
-**Flujo:** orders → REST → inventory + shipping → REST → notification
+**Flujo de negocio:** orders --REST--> inventory + shipping --REST--> notification
 
 ---
 
-## Stack
+## Stack tecnologico
 
-| Capa | Tecnología |
+| Capa | Tecnologia |
 |------|-----------|
-| Frontend | React 18, TypeScript 5.7, Vite 6, Tailwind, shadcn/ui, PWA |
-| Backend | Node.js 22, Express 4, pg |
+| Frontend | React 18, TypeScript 5.7, Vite 6, Tailwind CSS, shadcn/ui, PWA |
 | BFF | Nginx Alpine (reverse proxy) |
-| DB | PostgreSQL 15 Alpine, 4 bases (orders_db, inventory_db, shipping_db, notification_db) |
-| Infra | Docker Compose, Docker Hub, Vercel, CloudFormation |
+| Microservicios | Node.js 22, Express 4, pg (PostgreSQL) |
+| Base de datos | PostgreSQL 15 Alpine, 1 DB por servicio |
+| Infraestructura | Docker Compose, Docker Hub, Vercel, VM DigitalOcean |
 | RAM total | ~500 MB (6 contenedores) |
 
 ---
 
-## Inicio rápido
+## Inicio rapido
 
 ```bash
 # Clonar
 git clone https://github.com/JONAHBRUZZI/smartlogix.git
 cd SmartLogix
 
-# Backend (local)
-docker compose -f docker-compose.node.yml up -d
+# Backend (Docker Compose)
+docker compose -f docker-compose.node.yml up -d --build
 
-# Probar
+# Verificar
 curl http://localhost:80/healthz
 curl http://localhost:80/api/orders/test
-
-# Backup BD
-docker exec smartlogix-db pg_dumpall -U postgres > backup.sql
 ```
 
 ---
 
-## Despliegue VM
+## Despliegue en VM
 
 ```bash
-# En la VM (104.248.60.29)
+# En la VM de produccion
 cd ~/smartlogix && git pull
 docker compose -f docker-compose.vm.yml down
 docker compose -f docker-compose.vm.yml up -d
@@ -85,39 +82,44 @@ curl http://localhost:80/healthz
 ## Endpoints API
 
 ### Orders (:8081)
-| Método | Ruta | Descripción |
+
+| Metodo | Ruta | Descripcion |
 |--------|------|-------------|
 | GET | /api/orders/test | Health check |
 | POST | /api/orders | Crear orden |
 | GET | /api/orders | Listar todas |
-| PUT | /api/orders/:id/confirm | Confirmar (dispara flujo completo) |
-| PUT | /api/orders/:id/cancel | Cancelar |
+| PUT | /api/orders/:id/confirm | Confirmar (flujo completo) |
+| PUT | /api/orders/:id/cancel | Cancelar orden |
 | PUT | /api/orders/:id/status?status=X | Cambiar estado |
 | PUT | /api/orders/:id/assign?transporter=X | Asignar transportista |
+| DELETE | /api/orders/:id | Eliminar orden |
 | GET | /api/customers | Listar clientes |
 
 ### Inventory (:8082)
-| Método | Ruta | Descripción |
+
+| Metodo | Ruta | Descripcion |
 |--------|------|-------------|
 | GET | /api/inventory | Listar productos |
 | GET | /api/inventory/:sku | Consultar SKU |
 | POST | /api/inventory | Agregar producto |
-| PUT | /api/inventory/:sku | Actualizar stock |
-| POST | /api/inventory/:sku/adjust?delta=N | Ajustar +/- |
+| DELETE | /api/inventory/:sku | Eliminar producto |
+| POST | /api/inventory/:sku/adjust?delta=N | Ajustar stock |
 | GET | /api/sales | Listar ventas |
 | POST | /api/sales | Registrar venta |
 
 ### Shipping (:8084)
-| Método | Ruta | Descripción |
+
+| Metodo | Ruta | Descripcion |
 |--------|------|-------------|
-| GET | /api/shipments | Listar envíos |
-| GET | /api/shipments/:orderId | Envío por orden |
-| POST | /api/shipments | Crear envío + tracking |
+| GET | /api/shipments | Listar envios |
+| GET | /api/shipments/:orderId | Envio por orden |
+| POST | /api/shipments | Crear envio + tracking |
 | PUT | /api/shipments/:id/stage?stage=X | Cambiar etapa |
-| GET | /api/shipments/:id/qr | Código QR |
+| GET | /api/shipments/:id/qr | Codigo QR |
 
 ### Notification (:8085)
-| Método | Ruta | Descripción |
+
+| Metodo | Ruta | Descripcion |
 |--------|------|-------------|
 | POST | /api/notifications | Persistir evento |
 | GET | /api/notifications/order/:id | Trazabilidad de orden |
@@ -125,47 +127,43 @@ curl http://localhost:80/healthz
 
 ---
 
-## Flujo de negocio completo
+## Flujo de negocio (ejemplo con curl)
 
 ```bash
 # 1. Crear orden
-curl -s -X POST http://localhost:80/api/orders \
+curl -X POST http://localhost:80/api/orders \
   -H "Content-Type: application/json" \
   -d '{"customerId":1,"sku":"100001","quantity":3}'
 
-# 2. Confirmar (ajusta stock + crea envío + notifica)
-curl -s -X PUT http://localhost:80/api/orders/1/confirm
+# 2. Confirmar (ajusta stock + crea envio + notifica)
+curl -X PUT http://localhost:80/api/orders/1/confirm
 
-# 3. Ver trazabilidad
-curl -s http://localhost:80/api/notifications/order/1 | python3 -m json.tool
+# 3. Trazabilidad completa
+curl http://localhost:80/api/notifications/order/1 | python3 -m json.tool
 
-# 4. Avanzar envío
-curl -s -X PUT "http://localhost:80/api/shipments/1/stage?stage=EN_REPARTO"
-curl -s -X PUT "http://localhost:80/api/shipments/1/stage?stage=ENTREGADO" \
+# 4. Avanzar envio hasta entregado
+curl -X PUT "http://localhost:80/api/shipments/1/stage?stage=EN_REPARTO"
+curl -X PUT "http://localhost:80/api/shipments/1/stage?stage=ENTREGADO" \
   -H "Content-Type: application/json" \
   -d '{"customerCode":"C123"}'
 ```
 
 ---
 
-## Estructura
+## Estructura del proyecto
 
 ```
 SmartLogix/
-├── Frontend/              # React SPA (NPM)
+├── Frontend/                  # React SPA (NPM)
 ├── Backend/
-│   ├── orders-service/    # Node.js :8081
-│   ├── inventory-service/ # Node.js :8082
-│   ├── shipping-service/  # Node.js :8084
-│   ├── notification-service/ # Node.js :8085
-│   ├── nginx/             # API Gateway config
-│   ├── shared/            # db, logger, validate, shutdown
-│   ├── infrastructure/    # CloudFormation AWS
-│   ├── init-db.sql        # Creacion de bases
-│   └── seed.sql           # Datos de prueba
-├── ENTREGABLE/            # Documentacion encargo
-├── docker-compose.node.yml
-├── docker-compose.vm.yml
-├── docker-compose.optimized.yml
-└── docker-compose.prod.yml
+│   ├── orders-service/        # Node.js Express :8081
+│   ├── inventory-service/     # Node.js Express :8082
+│   ├── shipping-service/      # Node.js Express :8084
+│   ├── notification-service/  # Node.js Express :8085
+│   ├── nginx/                 # Config BFF (API Gateway)
+│   ├── shared/                # db, logger, validate, shutdown
+│   ├── init-db.sql            # Creacion de 4 bases de datos
+│   └── seed.sql               # Datos de prueba
+├── docker-compose.node.yml    # Desarrollo (build local)
+└── docker-compose.vm.yml      # Produccion (imagenes Docker Hub)
 ```

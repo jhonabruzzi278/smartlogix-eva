@@ -1,50 +1,24 @@
-# Global ignores for SmartLogix Backend
-# Java
-**/target/
-**/.classpath
-**/.project
-**/.settings/
+# SmartLogix Backend
+
+# Dependencies
+node_modules/
+
+# Environment
+*.env
+.env.*
+
+# Logs
 *.log
-
-# Python
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/*.pyd
-
-# VSCode
-.vscode/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Docker
-**/data/
-*.env
-.env.*
-
-# General
-*.iml
+# IDE
+.vscode/
 .idea/
 *.swp
 *.swo
 
-# Ignore PDFs and SVGs (remove if you want to keep these in git)
-*.pdf
-*.svg
-
-# Ignore local scripts output
-scripts/reports/
-
-# Ignore generated files
-**/generated-sources/
-**/generated-test-sources/
-
-# Ignore build tools
-**/mvnw
-**/mvnw.cmd
-
-# Ignore shell history
-*.sh~
-*.bak
+# Docker
+**/data/

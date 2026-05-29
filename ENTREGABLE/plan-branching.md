@@ -1,71 +1,138 @@
-﻿# Plan de Branching -- SmartLogix
+# Plan de Branching (Estrategia de Ramas)
 
 **Proyecto:** SmartLogix
 **Repositorio:** https://github.com/JONAHBRUZZI/smartlogix
-**Estrategia:** Trunk-Based Development
-**Fecha:** Mayo 2026
+**Estrategia:** GitHub Flow (simplificada)
 
 ---
 
-## Estrategia
+## Estrategia elegida: GitHub Flow
 
-Trunk-Based Development con feature branches cortas. Una rama principal `main` donde cada commit es deployable. Features se desarrollan en branches de corta duracion (< 1 dia) y se mergean directo a main.
+SmartLogix usa una estrategia de branching basada en **GitHub Flow**, que es una simplificacion de GitFlow adecuada para equipos pequeños y despliegue continuo.
 
-| Rama | Proposito |
-|------|----------|
-| `main` | Producción. Cada commit es deployable. |
+### ¿Por que GitHub Flow?
+
+- **Simplicidad:** Solo 2 tipos de ramas (main + feature branches).
+- **Despliegue continuo:** Cada merge a `main` dispara el deploy automatico a Vercel (frontend).
+- **Equipo pequeño:** No se necesita la complejidad de GitFlow (develop, release, hotfix).
+- **Integracion con Vercel:** Vercel hace preview deployments por cada PR, facilitando la revision.
 
 ---
 
-## Flujo de trabajo
+## Estructura de ramas
+
+```
+main (produccion)
+  │
+  ├── feature/nombre-descriptivo
+  ├── fix/nombre-del-bug
+  └── docs/actualizacion-readme
+```
+
+### Rama principal: `main`
+
+- **Proposito:** Codigo listo para produccion.
+- **Regla:** Nunca se hace push directo a `main`.
+- **Proteccion:** Vercel escucha `main` y despliega automaticamente a https://smartlogix-five.vercel.app.
+- **Estado esperado:** Siempre compila y pasa los tests.
+
+### Ramas de trabajo
+
+| Prefijo | Proposito | Ejemplo |
+|---------|----------|---------|
+| `feature/` | Nueva funcionalidad | `feature/order-delete-endpoint` |
+| `fix/` | Correccion de bug | `fix/null-slice-error` |
+| `docs/` | Documentacion | `docs/readme-microservicios` |
+
+---
+
+## Flujo de trabajo paso a paso
+
+### 1. Crear rama desde main
 
 ```bash
-git checkout -b feature/nombre    # Crear branch
-git add -A && git commit -m "..." # Commits atomicos
-git push origin feature/nombre    # Push
-git checkout main && git merge    # Merge a main
-git push                          # Deploy automatico
+git checkout main
+git pull origin main
+git checkout -b feature/mi-funcionalidad
+```
+
+### 2. Desarrollar y commitear
+
+```bash
+# Hacer cambios...
+git add -A
+git commit -m "feat: descripcion breve del cambio"
+git push origin feature/mi-funcionalidad
+```
+
+### 3. Crear Pull Request en GitHub
+
+- Desde `feature/mi-funcionalidad` hacia `main`
+- Vercel crea un **preview deployment** automatico con URL unica
+- Revisar el preview antes de mergear
+
+### 4. Merge a main
+
+- Usar **Squash and Merge** para mantener el historial de `main` limpio
+- El merge dispara el deploy a produccion en Vercel
+
+### 5. Actualizar VM del backend (si aplica)
+
+```bash
+# SSH a la VM de produccion
+ssh root@104.248.60.29
+cd ~/smartlogix
+git pull origin main
+docker compose -f docker-compose.vm.yml up -d
 ```
 
 ---
 
-## Historial de commits
+## Convencion de commits
+
+Se sigue el formato de **Conventional Commits**:
 
 ```
-e61d0c7 docs: README general actualizado
-b1bac5c docs: documentacion final para encargo
-403c0e4 Eliminar SQS: flujo REST directo entre servicios
-89f1808 Fix: rate limit xForwardedFor + validate array
-e7f5583 Fix: shared modules + Dockerfiles contexto Backend
-5ef9a50 Fix: /api/customers endpoint + nginx route
-ce35a41 redeploy trigger dashboard
-2bf9363 Fix DB_URL por servicio
-adaa437 Fix vm.yml: service_started
-6e91cbd Fix elasticmq healthcheck
-d825f7c Frontend proxy puerto 80 + build Vercel
-befadc1 Merge: fix healthcheck elasticmq (conflicto resuelto)
-ce1d94c Documentacion Node-only
-b2d4838 Limpiar leftovers Java
-2910782 Fix CRITICAL + health endpoints
-5724c79 Refactor backend a Node.js/Express
-bc8bade Fix: ajuste inventario POST
-def3311 Agregar Swagger/OpenAPI
-460562a Reemplazo SNS por REST + compose VM
+<tipo>: <descripcion breve>
+
+[opcional: cuerpo con mas detalle]
+```
+
+**Tipos:**
+
+| Tipo | Uso |
+|------|-----|
+| `feat` | Nueva funcionalidad |
+| `fix` | Correccion de bug |
+| `docs` | Cambios en documentacion |
+| `style` | Formato, espacios, punto-y-coma (sin cambio de logica) |
+| `refactor` | Refactorizacion de codigo |
+| `test` | Agregar o corregir tests |
+| `chore` | Tareas de build, config, dependencias |
+
+**Ejemplos:**
+```
+feat: agregar endpoint DELETE para pedidos
+fix: evitar error .slice() en null al cargar detalle de pedido
+docs: crear README para cada microservicio
+chore: eliminar archivos CloudFormation no usados
 ```
 
 ---
 
-## Evidencia de conflictos resueltos
+## Ramas activas actuales
 
-- **befadc1**: Conflicto en `docker-compose.node.yml`. Healthcheck de elasticmq incompatible. Resuelto removiendo healthcheck y usando `service_started`.
-- **ce35a41**: Archivos generados por `vite.config.ts` en conflicto. Resuelto con `--ours`.
+| Rama | Estado | Proposito |
+|------|--------|----------|
+| `main` | Activa | Produccion |
 
 ---
 
-## Justificación
+## Reglas
 
-Trunk-Based Development elegido por:
-- Equipo de 1 persona (no requiere develop)
-- CI/CD a Vercel y Docker Hub en cada push a main
-- Commits atomicos con mensajes descriptivos
-- Feature branches cortas evitan conflictos
+1. `main` siempre debe compilar (`npm run build` exitoso)
+2. No hacer push directo a `main` (usar PR)
+3. Cada commit debe tener un mensaje descriptivo
+4. Usar prefijos de Conventional Commits
+5. Los PRs deben revisarse antes de mergear (idealmente)
+6. Mantener las ramas de feature efimeras (borrar despues del merge)
