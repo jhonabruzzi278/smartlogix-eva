@@ -4,8 +4,8 @@ services:
     container_name: smartlogix-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=admin123
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
     command: >
       postgres
       -c shared_buffers=32MB
@@ -22,7 +22,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./Backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d postgres"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -31,10 +31,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 256M
 
   sqs-mock:
-    image: softwaremill/elasticmq:latest
+    image: softwaremill/elasticmq:1.6.7
     container_name: smartlogix-sqs-mock
     restart: unless-stopped
     volumes:
@@ -43,7 +43,7 @@ services:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9324"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
     networks:
       - smartlogix-net
     deploy:
@@ -56,18 +56,26 @@ services:
     container_name: smartlogix-orders
     restart: unless-stopped
     environment:
-      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/orders_db
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_SQS_ENDPOINT=http://sqs-mock:9324
       - ORDERS_QUEUE=orders-queue
+      - INVENTORY_SERVICE_URL=http://inventory-service:8082
+      - SHIPPING_SERVICE_URL=http://shipping-service:8084
+      - SERVICE_NAME=orders-service
+      - LOG_LEVEL=info
+      - ALLOWED_ORIGINS=*
       - PORT=8081
     depends_on:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_started
+        condition: service_healthy
     networks:
       - smartlogix-net
     deploy:
@@ -80,18 +88,25 @@ services:
     container_name: smartlogix-inventory
     restart: unless-stopped
     environment:
-      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/inventory_db
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_SQS_ENDPOINT=http://sqs-mock:9324
       - SHIPPING_QUEUE=shipping-queue
+      - ORDERS_QUEUE=orders-queue
+      - SERVICE_NAME=inventory-service
+      - LOG_LEVEL=info
+      - ALLOWED_ORIGINS=*
       - PORT=8082
     depends_on:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_started
+        condition: service_healthy
     networks:
       - smartlogix-net
     deploy:
@@ -104,19 +119,25 @@ services:
     container_name: smartlogix-shipping
     restart: unless-stopped
     environment:
-      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/shipping_db
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_SQS_ENDPOINT=http://sqs-mock:9324
       - SHIPPING_QUEUE=shipping-queue
       - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - SERVICE_NAME=shipping-service
+      - LOG_LEVEL=info
+      - ALLOWED_ORIGINS=*
       - PORT=8084
     depends_on:
       postgres-db:
         condition: service_healthy
       sqs-mock:
-        condition: service_started
+        condition: service_healthy
     networks:
       - smartlogix-net
     deploy:
@@ -129,7 +150,13 @@ services:
     container_name: smartlogix-notification
     restart: unless-stopped
     environment:
-      - DB_URL=postgresql://postgres:admin123@postgres-db:5432/notification_db
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
+      - SERVICE_NAME=notification-service
+      - LOG_LEVEL=info
+      - ALLOWED_ORIGINS=*
       - PORT=8085
     depends_on:
       postgres-db:
@@ -142,7 +169,7 @@ services:
           memory: 128M
 
   api-gateway:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: smartlogix-api-gateway
     restart: unless-stopped
     ports:
@@ -150,10 +177,14 @@ services:
     volumes:
       - ./Backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - orders-service
-      - inventory-service
-      - shipping-service
-      - notification-service
+      orders-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      shipping-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
     networks:
       - smartlogix-net
     deploy:

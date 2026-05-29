@@ -105,7 +105,9 @@ export function adaptShipment(apiShipment: ApiShipment): Shipment {
     carrier: apiShipment.trackingNumber ? "Transportista asignado" : "Pendiente de asignacion",
     tracking: apiShipment.trackingNumber ?? "Pendiente",
     stage,
-    eta: apiShipment.shippedAt ?? apiShipment.createdAt ?? null,
+    eta: apiShipment.status === 'EN_REPARTO'
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      : apiShipment.shippedAt ?? apiShipment.createdAt ?? null,
     createdAt: apiShipment.createdAt ?? new Date().toISOString(),
     shippedAt: apiShipment.shippedAt ?? null,
     exception: stage === "cancelado" ? "Envio cancelado" : undefined,

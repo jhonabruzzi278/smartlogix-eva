@@ -10,7 +10,7 @@ interface UseApiQueryOptions<TResponse, TData> {
 }
 
 interface UseApiQueryResult<TData> {
-  data: TData;
+  data: TData | null;
   loading: boolean;
   error: string | null;
   source: ApiSource;
@@ -33,7 +33,7 @@ export function useApiQuery<TResponse, TData>({
   transform,
   enabled = true
 }: UseApiQueryOptions<TResponse, TData>): UseApiQueryResult<TData> {
-  const [data, setData] = useState<TData>(null as unknown as TData);
+  const [data, setData] = useState<TData | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<ApiSource>("live");

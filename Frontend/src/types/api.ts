@@ -54,7 +54,7 @@ export interface ApiShipment {
   id: number;
   orderId: number;
   customerId: number;
-  sku: number;
+  sku: string;
   quantity: number;
   status: string;
   trackingNumber: string | null;
