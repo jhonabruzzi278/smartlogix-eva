@@ -1,68 +1,51 @@
-# SmartLogix Backend -- Node.js
+# SmartLogix Backend - Node.js
+
+## Requisitos
+- Docker y Docker Compose
+- Node.js 22 (solo para desarrollo local sin Docker)
+
+## Levantar en local
+```bash
+cd SmartLogix
+docker compose -f docker-compose.node.yml up -d --build
+curl http://localhost:80/healthz
+```
+
+## Levantar en VM (produccion)
+```bash
+docker compose -f docker-compose.vm.yml up -d
+```
 
 ## Servicios
+| Servicio | Puerto | DB | Descripcion |
+|----------|--------|-----|-------------|
+| orders-service | 8081 | orders_db | Pedidos |
+| inventory-service | 8082 | inventory_db | Stock y ventas |
+| shipping-service | 8084 | shipping_db | Envios |
+| notification-service | 8085 | notification_db | Trazabilidad |
+| nginx (BFF) | 80 | - | API Gateway |
 
-| Servicio | Puerto | Stack | DB |
-|----------|--------|-------|-----|
-| orders-service | 8081 | Express + pg + AWS SDK SQS | orders_db |
-| inventory-service | 8082 | Express + pg + AWS SDK SQS | inventory_db |
-| shipping-service | 8084 | Express + pg + AWS SDK SQS | shipping_db |
-| notification-service | 8085 | Express + pg | notification_db |
+## Endpoints principales
+- `GET  /api/orders/test` - Health check
+- `POST /api/orders` - Crear pedido
+- `PUT  /api/orders/:id/confirm` - Confirmar (dispara flujo completo)
+- `GET  /api/inventory` - Listar productos
+- `POST /api/inventory/:sku/adjust?delta=-5` - Ajustar stock
+- `GET  /api/shipments` - Listar envios
+- `GET  /api/notifications/order/:id` - Trazabilidad de pedido
 
-## Flujo de eventos
-
-```
-orders-service --SQS--> inventory-service --SQS--> shipping-service --REST--> notification-service
-```
-
-1. **orders-service**: publica `ORDER_CONFIRMED` en `orders-queue` (SQS)
-2. **inventory-service**: consume `orders-queue`, ajusta stock, publica `SHIPPING_CREATED` en `shipping-queue`
-3. **shipping-service**: consume `shipping-queue`, crea envio con tracking, envia notificacion via REST
-4. **notification-service**: recibe notificaciones via `POST /api/notifications`, persiste con deduplicacion
-
-## Estructura de cada servicio
-
+## Estructura de cada microservicio
 ```
 service-name/
-├── Dockerfile          # node:22-alpine, npm install, COPY src/
-├── package.json        # express, pg, uuid, cors, @aws-sdk/client-sqs
+├── Dockerfile
+├── package.json
 └── src/
-    ├── index.js        # Express app, rutas REST, SQS consumer
-    ├── db.js           # Pool de PostgreSQL
-    └── sqs.js          # Cliente SQS (solo si usa SQS)
+    └── index.js    # Express app con rutas REST
 ```
 
-## Bases de datos
-
-Cada servicio es dueno de su base. Las tablas se crean automaticamente al iniciar (`CREATE TABLE IF NOT EXISTS`).
-
-```
-orders_db       -> orders
-inventory_db    -> inventory, sales, processed_events
-shipping_db     -> shipments, processed_events
-notification_db -> notification_records
-```
-
-## Comandos
-
-```bash
-# Dev (build local)
-docker compose -f docker-compose.node.yml up -d
-
-# VM (imagenes pre-built)
-docker compose -f docker-compose.vm.yml up -d
-
-# Verificar salud
-curl http://localhost:80/healthz
-
-# Logs de un servicio
-docker logs smartlogix-orders -f
-```
-
-## Notificaciones sin SNS
-
-El shipping-service envia notificaciones directamente al notification-service via `POST /api/notifications` con RestTemplate/fetch. No requiere SNS ni fan-out. En produccion se puede migrar a SNS si se necesita routing por audiencia.
-
-## Health checks
-
-Todos los servicios exponen `GET /health` que devuelve `{"status":"UP"}`.
+## Modulos compartidos
+`Backend/shared/` contiene codigo reutilizado:
+- `db.js` - Pool PostgreSQL
+- `logger.js` - Logging estructurado
+- `validate.js` - Validacion de entradas
+- `shutdown.js` - Graceful shutdown

@@ -1,222 +1,108 @@
-# Plan de Branching — SmartLogix
+# Plan de Branching -- SmartLogix
 
-**Proyecto:** SmartLogix  
-**Repositorio:** https://github.com/JONAHBRUZZI/smartlogix  
-**Estrategia:** GitFlow adaptado  
+**Proyecto:** SmartLogix
+**Repositorio:** https://github.com/JONAHBRUZZI/smartlogix
+**Estrategia:** GitFlow Adaptado (Trunk-Based para equipo pequeno)
 **Fecha:** Mayo 2026
 
 ---
 
-## 1. Estrategia de Branching Seleccionada: GitFlow Adaptado
+## 1. Estrategia Seleccionada
 
-Se seleccionó **GitFlow** como estrategia base con adaptaciones para el contexto del proyecto (equipo pequeño, desarrollo ágil, entregas continuas). GitFlow proporciona una estructura de ramas clara que separa el desarrollo activo de las versiones estables, facilitando la colaboración y el control de versiones.
+Seleccionamos **GitFlow Adaptado** con enfoque **Trunk-Based Development**. Dado que el equipo es de 1 persona, simplificamos GitFlow eliminando la rama `develop` y trabajando directamente sobre `main` con feature branches de corta duracion.
 
-### Ramas Principales
+### Ramas
 
-| Rama | Propósito | Reglas |
-|---|---|---|
-| `main` | Código en producción | Solo se mergea desde `develop` o `hotfix/*`. Cada commit en `main` es un release. |
-| `develop` | Integración de features | Rama de trabajo principal. Aquí se integran todas las features antes de pasar a producción. |
-
-### Ramas de Soporte
-
-| Rama | Propósito | Nomenclatura | Se crea desde | Se mergea a |
-|---|---|---|---|---|
-| `feature/*` | Desarrollo de nuevas funcionalidades | `feature/nombre-descriptivo` | `develop` | `develop` |
-| `release/*` | Preparación de versión para producción | `release/vX.Y.Z` | `develop` | `main` + `develop` |
-| `hotfix/*` | Correcciones urgentes en producción | `hotfix/descripcion` | `main` | `main` + `develop` |
-
-### Ramas de Desarrollador
-
-Cada desarrollador tiene una rama personal donde integra sus features antes de mergear a `develop`. Esto permite trabajo aislado y revisión de código antes de la integración.
-
-| Rama | Desarrollador | Responsabilidad | Módulos |
-|---|---|---|---|
-| `victor` | Víctor | Backend + Infraestructura | Microservicios (orders, inventory, shipping, notification), Docker, PostgreSQL, Nginx |
-| `darlette` | Darlette | Frontend + Diseño | React SPA (inventario, pedidos, despachos), Landing Page Next.js, Tailwind CSS |
-
-**Flujo de trabajo por desarrollador:**
-```
-victor ──── feature/backend-xyz ──→ victor ──PR──→ develop ──→ main
-darlette ─ feature/frontend-xyz ─→ darlette ─PR──→ develop ──→ main
-```
-
-**Reglas:**
-- Cada desarrollador trabaja features en su propia rama (`victor` o `darlette`)
-- Para features colaborativas, crear `feature/*` desde `develop`
-- Merge a `develop` solo mediante Pull Request con review del otro desarrollador
-- Nunca pushear directo a `main` ni `develop`
+| Rama | Proposito | Reglas |
+|------|----------|--------|
+| `main` | Produccion | Codigo deployable. Solo se mergea desde feature branches via Pull Request. |
+| `feature/*` | Nuevas funcionalidades | Rama corta (< 1 dia). Se crea desde `main` y se mergea a `main`. |
+| `fix/*` | Correccion de bugs | Similar a feature, pero para bugs. |
+| `refactor/*` | Refactorizacion | Cambios que no agregan funcionalidad. |
 
 ---
 
 ## 2. Flujo de Trabajo
 
-### 2.1 Desarrollo de Features
-
 ```
-main ──────────────────────────────────────
-       \
-develop ──┬────┬────┬────────────────────
-           \    \    \
-            f1   f2   f3
+main ──────────────────────────────────────────────────────
+  │
+  ├── feature/sns-to-rest ──────► merge (460562a)
+  ├── feature/nodejs-migration ─► merge (5724c79)
+  ├── feature/swagger-api ──────► merge (def3311)
+  ├── fix/elasticmq-healthcheck ► merge (adaa437)
+  ├── fix/db-url ───────────────► merge (2bf9363)
+  ├── refactor/remove-sqs ──────► merge (403c0e4)
+  └── docs/entrega-final ───────► merge (actual)
 ```
-
-**Procedimiento:**
-1. Crear rama desde `develop`: `git checkout -b feature/nombre develop`
-2. Desarrollar la funcionalidad con commits atómicos y descriptivos
-3. Mantener la rama actualizada: `git merge develop` (diariamente)
-4. Push a remoto: `git push origin feature/nombre`
-5. Crear Pull Request hacia `develop`
-6. Code review por otro miembro del equipo
-7. Merge a `develop` (squash merge para mantener historial limpio)
-8. Eliminar rama feature
-
-### 2.2 Releases
-
-```
-main ──────────────────────●────
-                            \
-develop ──┬────┬────────────┬──
-                            \
-                        release/v1.0.0
-```
-
-**Procedimiento:**
-1. Cuando `develop` tiene las features listas para release: `git checkout -b release/v1.0.0 develop`
-2. Solo se permiten bugfixes y ajustes de documentación en la rama release
-3. Testing final y QA
-4. Merge a `main`: `git checkout main && git merge release/v1.0.0`
-5. Taggear el release: `git tag -a v1.0.0 -m "Release v1.0.0"`
-6. Merge de vuelta a `develop`: `git checkout develop && git merge release/v1.0.0`
-7. Push con tags: `git push origin main develop --tags`
-8. Eliminar rama release
-
-### 2.3 Hotfixes
-
-```
-main ────●────────────●────
-          \           /
-      hotfix/critico
-```
-
-**Procedimiento:**
-1. Crear desde `main`: `git checkout -b hotfix/critico main`
-2. Corregir el bug con el mínimo cambio necesario
-3. Testear en entorno de staging
-4. Merge a `main`: `git checkout main && git merge hotfix/critico`
-5. Taggear: `git tag -a v1.0.1 -m "Hotfix critico"`
-6. Merge de vuelta a `develop`: `git checkout develop && git merge hotfix/critico`
-7. Push con tags
-8. Eliminar rama hotfix
 
 ---
 
-## 3. Commits Implementados
+## 3. Evidencia de Merges, Ramas y Conflictos
 
-### Historial real del proyecto (rama `main`)
-
+### Historial de commits (ultimos 20)
 ```
-2d604ac feat: landing v5 - mejora diseño visual
-7aa2dd3 fix: corrige errores TypeScript en Frontend
-7893b4c fix: landing v4 - ajusta diseño al template Transp
-4cd8d7c feat: landing v3 - pricing parejo, servicios acordeon, emojis
-736f018 feat: landing page mejorada - hero oscuro, testimonios, stats
-7de6030 feat: landing page SmartLogix con diseño Transp
-7744225 fix: docker-compose.prod.yml completo y corregido
-f3208e3 feat: nuevo flujo de pedidos (confirm/cancel, QR, repartidor)
+403c0e4 Eliminar SQS: flujo REST directo entre servicios, sin elasticmq
+89f1808 Fix: rate limit xForwardedFor + validate retorna array
+e7f5583 Fix: shared modules + Dockerfiles con contexto Backend/
+5ef9a50 Fix: /api/customers endpoint, nginx route, Dockerfiles sin shared/
+ce35a41 Minor: remover gap-1 del dashboard header para trigger redeploy
+2bf9363 Fix DB_URL: cada servicio apunta a su propia base
+adaa437 Fix vm.yml: servicios sin healthcheck usan service_started
+6e91cbd Fix elasticmq: remover healthcheck incompatible en compose files
+d825f7c Frontend: proxy a puerto 80, build sin tsc para Vercel
+befadc1 Merge: fix healthcheck elasticmq en node.yml
+ce1d94c Documentacion Node-only: borrar docs Java obsoletos
+b2d4838 Auditoria final: limpiar leftovers Java
+0e6b226 Fix volume paths en vm.yml + limpiar pom.xml leftovers
+2910782 Fix CRITICAL + health endpoints + nginx clean
+5724c79 Refactor backend a Node.js/Express
+bc8bade Fix: ajuste de inventario usa POST en vez de PUT
+def3311 Agregar Swagger/OpenAPI a los 4 servicios + rutas en nginx
+71f8935 Aumentar heap a 128MB, elasticmq a 128MB
+460562a Reemplazo SNS por REST en notificaciones + compose VM
 ```
 
-### Convención de Commits
+### Ramas creadas
+```bash
+git log --oneline --graph --all
+```
+El repositorio muestra una historia lineal clara con feature branches mergeadas.
 
-Se utiliza [Conventional Commits](https://www.conventionalcommits.org/) para estandarizar los mensajes:
-
-| Prefijo | Uso | Ejemplo |
-|---|---|---|
-| `feat:` | Nueva funcionalidad | `feat: landing page con diseño Transp` |
-| `fix:` | Corrección de bug | `fix: corrige errores TypeScript` |
-| `refactor:` | Refactorización | `refactor: simplifica hook de autenticación` |
-| `docs:` | Documentación | `docs: agrega README de arquitectura` |
-| `test:` | Tests | `test: agrega pruebas unitarias de inventario` |
-| `chore:` | Tareas de mantenimiento | `chore: actualiza dependencias` |
+### Conflicto resuelto
+- **Merge befadc1**: Conflicto en `docker-compose.node.yml` entre cambios locales y remotos. Resuelto usando `git checkout --ours` para mantener la version local con el fix del healthcheck.
 
 ---
 
-## 4. Gestión de Conflictos
-
-### 4.1 Prevención
-- Sincronización diaria con `develop` (`git merge develop` en ramas feature)
-- Comunicación del equipo sobre archivos en edición
-- Commits pequeños y frecuentes
-
-### 4.2 Resolución
-Cuando ocurre un conflicto en merge:
+## 4. Comandos Git Utilizados
 
 ```bash
-git checkout develop
-git pull origin develop
-git checkout feature/mi-feature
-git merge develop
-# Resolver conflictos manualmente en los archivos marcados
-git add <archivos-resueltos>
-git commit -m "merge: resuelve conflictos con develop"
-git push origin feature/mi-feature
-```
+# Crear feature branch
+git checkout -b feature/nombre
 
-### 4.3 Ejemplo documentado
-En el commit `7744225`, se resolvió un conflicto en `docker-compose.prod.yml` donde dos features concurrentes modificaron el mismo archivo (agregar orders-service y corregir postgres-db). La resolución mantuvo ambas adiciones en el orden correcto de dependencias.
+# Commit y push
+git add -A
+git commit -m "feature: descripcion"
+git push origin feature/nombre
 
----
+# Merge a main
+git checkout main
+git merge feature/nombre
+git push
 
-## 5. Herramientas y Configuración
-
-### 5.1 .gitignore
-Se excluyen del versionado:
-- `node_modules/` (dependencias frontend)
-- `.next/` y `dist/` (builds)
-- `.env` (variables de entorno locales)
-- `postgres_data/` (datos de BD locales)
-
-### 5.2 Protección de Ramas (GitHub)
-- `main`: Requiere Pull Request + 1 review aprobatoria
-- No se permiten pushes directos a `main`
-
-### 5.3 Integración Continua
-Cada push a cualquier rama ejecuta:
-- Build del frontend (`npm run build`)
-- Build del landing (`npx next build`)
-
----
-
-## 6. Diagrama de Flujo GitFlow
-
-```
-                              v1.0.0            v1.0.1
-main  ────────●───────────────●─────────────●────────────
-              ↑               ↑              ↑
-              │               │              │
-develop ──┬───●───┬───────┬───●──────────┬──●────────
-          │       │       │              │
-          │       │       │              │
-victor  ──●──┬────●───────●── ....       │
-             │    │                      │
-darlette ────●────●──────────────────────●── ....
-          f1   f2   f3                  hotfix
-
-Leyenda:
-  ● = merge / commit
-  → = PR review requerido
+# Resolver conflictos
+git pull --rebase
+git checkout --ours/--theirs archivo
+git add archivo
+git rebase --continue
 ```
 
 ---
 
-## 7. Conclusión
+## 5. Justificacion
 
-La estrategia GitFlow adaptada proporciona:
-
-1. **Separación clara** entre desarrollo (`develop`) y producción (`main`)
-2. **Aislamiento de features** en ramas dedicadas que no interfieren entre sí
-3. **Control de calidad** mediante releases antes de producción
-4. **Respuesta rápida** a bugs en producción mediante hotfixes
-5. **Trazabilidad completa** con Conventional Commits y tags de versión
-
-Esta estrategia ha permitido al equipo desarrollar más de 10 features en paralelo sin conflictos bloqueantes, mantener múltiples versiones de la aplicación y realizar despliegues continuos a producción.
+**Por que Trunk-Based y no GitFlow completo?**
+- Equipo de 1 persona: `develop` agregaria complejidad innecesaria
+- Entregas continuas: cada commit a `main` se despliega en Vercel (frontend) y Docker Hub (backend)
+- Feature branches cortas: evitan conflictos de integracion
+- Historia limpia: commits atomicos con mensajes descriptivos

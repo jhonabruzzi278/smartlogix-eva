@@ -1,157 +1,78 @@
-# SmartLogix
+# SmartLogix - Plataforma de Gestion Logistica
 
-Plataforma de gestion logistica para PYMEs -- inventario, pedidos, envios y notificaciones en tiempo real.
-
-> **Caso real:** Negocio "Don Juan -- Bebidas y Confites" (10 SKUs, 3 clientes, reparto local).
-
----
-
-## Arquitectura
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Frontend -- React 18 + Vite + Tailwind + PWA        │
-│ Despliegue: Vercel / S3 + CloudFront                │
-├─────────────────────────────────────────────────────┤
-│ API Gateway -- Nginx (reverse proxy, port 80)       │
-├──────────┬──────────┬──────────┬────────────────────┤
-│ orders   │ inventory│ shipping │ notification       │
-│ Express  │ Express  │ Express  │ Express            │
-│ Node.js  │ Node.js  │ Node.js  │ Node.js            │
-│ :8081    │ :8082    │ :8084    │ :8085              │
-├──────────┴──────────┴──────────┴────────────────────┤
-│ PostgreSQL 15 -- 4 bases, una por bounded context   │
-├─────────────────────────────────────────────────────┤
-│ SQS (ElasticMQ) -- mensajeria asincrona             │
-└─────────────────────────────────────────────────────┘
-```
+**Equipo:** Jonah Bruzzi
+**Repositorio:** https://github.com/JONAHBRUZZI/smartlogix
 
 ---
 
-## Stack Tecnologico
+## 1. Resumen Ejecutivo
+
+SmartLogix es una plataforma SaaS B2B multi-tenant para gestion logistica de PYMEs chilenas. Resuelve inventario, pedidos, despachos y trazabilidad en tiempo real usando una arquitectura de microservicios con Node.js, Express y PostgreSQL.
+
+---
+
+## 2. Estructura del Proyecto
+
+```
+SmartLogix/
+├── Frontend/                     # SPA React + Vite + TypeScript (NPM)
+├── Backend/
+│   ├── orders-service/           # Microservicio Node.js :8081
+│   ├── inventory-service/        # Microservicio Node.js :8082
+│   ├── shipping-service/         # Microservicio Node.js :8084
+│   ├── notification-service/     # Microservicio Node.js :8085
+│   ├── nginx/                    # API Gateway (BFF)
+│   ├── shared/                   # Modulos compartidos (db, logger, validate)
+│   └── infrastructure/           # CloudFormation (AWS)
+├── ENTREGABLE/                   # Documentacion del encargo
+│   ├── analisis-patrones-arquetipos.md
+│   ├── plan-branching.md
+│   └── repositorios.txt
+├── docker-compose.node.yml       # Dev con build local
+├── docker-compose.vm.yml         # Produccion VM
+└── docker-compose.optimized.yml  # Produccion optimizado
+```
+
+---
+
+## 3. Tecnologias
 
 | Capa | Tecnologia |
 |------|-----------|
-| **Frontend** | React 18, TypeScript 5.7, Vite 6, Tailwind CSS 3, shadcn, PWA |
-| **Backend** | Node.js 22, Express 4, pg, AWS SDK SQS |
-| **Mensajeria** | ElasticMQ (dev) / AWS SQS (prod) |
-| **Persistencia** | PostgreSQL 15 -- 4 bases (orders_db, inventory_db, shipping_db, notification_db) |
-| **API Gateway** | Nginx Alpine (reverse proxy) |
-| **Infra** | Docker Compose (dev), ECS Fargate (prod), CloudFormation |
-| **RAM en VM** | ~500 MB total (vs ~1.6 GB con Java) |
+| Frontend | React 18, TypeScript 5.7, Vite 6, Tailwind CSS, shadcn/ui, PWA |
+| Backend | Node.js 22, Express 4, pg (PostgreSQL) |
+| API Gateway | Nginx Alpine (BFF) |
+| Persistencia | PostgreSQL 15, 4 bases independientes |
+| Infra | Docker Compose, Docker Hub, CloudFormation |
+| CI/CD | Vercel (frontend), GitHub Actions, Docker Hub |
 
 ---
 
-## Inicio rapido
+## 4. Despliegue
 
-### 1. Clonar
-
-```bash
-git clone https://github.com/JONAHBRUZZI/smartlogix.git
-cd SmartLogix
-```
-
-### 2. Levantar backend
-
+### Local
 ```bash
 docker compose -f docker-compose.node.yml up -d
 ```
 
-### 3. Verificar
-
-```bash
-curl http://localhost:80/healthz
-curl http://localhost:80/api/orders/test
-```
-
-### 4. Desplegar en VM (1 vCPU / 2 GB)
-
+### VM (Produccion)
 ```bash
 docker compose -f docker-compose.vm.yml up -d
 ```
 
----
-
-## Flujo de negocio
-
+### Frontend (Vercel)
+```bash
+cd Frontend && npx vercel --prod
 ```
-POST /api/orders (crear pedido)
-  -> PUT /api/orders/{id}/confirm
-    -> POST inventory-service (ajusta stock)
-    -> SQS orders-queue (evento ORDER_CONFIRMED)
-    -> POST shipping-service (crea envio)
-      -> POST notification-service (REST, notificacion SHIPMENT_CREATED)
-```
-
-- **Mensajeria asincrona**: orders-service -> SQS -> inventory-service -> SQS -> shipping-service
-- **Notificaciones**: shipping-service -> REST POST -> notification-service
 
 ---
 
-## Endpoints API
+## 5. Endpoints
 
-### Orders Service (:8081)
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| POST | /api/orders | Crear orden |
-| GET | /api/orders | Listar todas |
-| GET | /api/orders/test | Health check |
-| PUT | /api/orders/:id/status?status={STATUS} | Cambiar estado |
-| PUT | /api/orders/:id/confirm | Confirmar orden |
-| PUT | /api/orders/:id/cancel | Cancelar orden |
-| PUT | /api/orders/:id/assign?transporter={NAME} | Asignar transportista |
-
-### Inventory Service (:8082)
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| GET | /api/inventory | Listar inventario |
-| GET | /api/inventory/:sku | Consultar SKU |
-| POST | /api/inventory | Agregar producto |
-| PUT | /api/inventory/:sku | Actualizar stock |
-| POST | /api/inventory/:sku/adjust?delta={N} | Ajustar stock (+/-) |
-| GET | /api/sales | Listar ventas |
-| POST | /api/sales | Registrar venta |
-
-### Shipping Service (:8084)
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| GET | /api/shipments | Listar envios |
-| GET | /api/shipments/:orderId | Envio por orden |
-| POST | /api/shipments | Crear envio |
-| PUT | /api/shipments/:id/stage?stage={STATUS} | Cambiar etapa |
-| GET | /api/shipments/:id/qr | QR del envio |
-
-### Notification Service (:8085)
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| POST | /api/notifications | Persistir notificacion |
-| GET | /api/notifications/order/:orderId | Notificaciones por orden |
-| GET | /api/notifications/audience/:audience | Notificaciones por audiencia |
-
----
-
-## Estructura del proyecto
-
-```
-SmartLogix/
-├── Backend/
-│   ├── orders-service/           # Express + pg + SQS
-│   ├── inventory-service/        # Express + pg + SQS
-│   ├── shipping-service/         # Express + pg + REST notificaciones
-│   ├── notification-service/     # Express + pg
-│   ├── nginx/                    # API Gateway config
-│   ├── scripts/                  # Utilidades
-│   ├── infrastructure/           # CloudFormation (AWS prod)
-│   ├── init-db.sql               # Creacion de bases de datos
-│   └── seed.sql                  # Datos de prueba
-├── Frontend/                     # React SPA + Vite + TypeScript
-├── Landing/                      # Next.js landing page
-├── docker-compose.node.yml       # Dev con build local
-├── docker-compose.vm.yml         # VM con imagenes pre-built
-├── docker-compose.optimized.yml  # Produccion optimizado
-├── docker-compose.prod.yml       # Produccion completo
-├── elasticmq.conf                # Configuracion de colas SQS
-├── README.md
-├── MODELO_NEGOCIO_CHILE.md
-└── ESTRUCTURA_DATOS.md
-```
+| Servicio | Puerto | Principales rutas |
+|----------|--------|------------------|
+| orders-service | 8081 | POST/GET /api/orders, PUT /confirm, /cancel, /assign |
+| inventory-service | 8082 | GET/POST /api/inventory, /adjust, GET/POST /api/sales |
+| shipping-service | 8084 | POST/GET /api/shipments, PUT /stage, GET /qr |
+| notification-service | 8085 | POST /api/notifications, GET /order/:id, /audience/:aud |
+| API Gateway | 80 | Nginx reverse proxy a los 4 servicios |

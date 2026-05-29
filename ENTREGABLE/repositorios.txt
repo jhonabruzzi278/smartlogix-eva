@@ -3,72 +3,69 @@
 ## Repositorio Principal
 https://github.com/JONAHBRUZZI/smartlogix
 
-Contiene todo el proyecto SmartLogix:
-- Frontend/ — Aplicacion SPA en React + Vite + TypeScript (sistema interno POS, inventario, pedidos, despachos)
-- Landing/ — Landing page en Next.js 16 + Tailwind CSS v4
-- Backend/ — 4 microservicios Node.js/Express + API Gateway Nginx + PostgreSQL
-- ENTREGABLE/ — Documentacion (analisis de patrones, plan de branching)
+Contiene el proyecto completo SmartLogix:
+- Frontend/ — Aplicacion SPA React + Vite + TypeScript (NPM)
+- Backend/ — 4 microservicios Node.js + BFF Nginx + PostgreSQL
+- ENTREGABLE/ — Documentacion (analisis patrones, plan branching, repositorios)
+- Docker Compose — Orquestacion multi-contenedor
 
-## Microservicios Backend
+---
 
-### orders-service
-- Codigo: Backend/orders-service/
-- Descripcion: Gestion de pedidos. CRUD de ordenes, cambio de estados, confirmacion y cancelacion. Base de datos: orders_db.
-- Patrones: Repository (pg), Observer (SQS)
-- Tecnologias: Node.js 22, Express, pg, AWS SDK SQS
-- Puerto: 8081
+## Componentes
 
-### inventory-service
-- Codigo: Backend/inventory-service/
-- Descripcion: Control de inventario. Gestion de productos, ajustes de stock, ventas. Base de datos: inventory_db.
-- Patrones: Repository (pg), Observer (SQS)
-- Tecnologias: Node.js 22, Express, pg, AWS SDK SQS
-- Puerto: 8082
+### Frontend (NPM)
+- **Ubicacion:** Frontend/
+- **Descripcion:** SPA con React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, PWA
+- **Ejecutar:** `npm install && npm run dev`
+- **Build:** `npm run build`
+- **Deploy:** Vercel (https://smartlogix-five.vercel.app)
 
-### shipping-service
-- Codigo: Backend/shipping-service/
-- Descripcion: Despachos. Generacion de envios desde pedidos confirmados, seguimiento con codigo QR, confirmacion de entrega. Base de datos: shipping_db.
-- Patrones: Repository (pg), Observer (SQS), REST notifications
-- Tecnologias: Node.js 22, Express, pg, AWS SDK SQS
-- Puerto: 8084
+### Backend For Frontend (BFF)
+- **Ubicacion:** Backend/nginx/
+- **Descripcion:** Nginx como API Gateway, reverse proxy y BFF
+- **Puerto:** 80
+- **Funcion:** Enruta peticiones del frontend a los 4 microservicios
 
-### notification-service
-- Codigo: Backend/notification-service/
-- Descripcion: Notificaciones. Persistencia y consulta de eventos de trazabilidad via REST. Base de datos: notification_db.
-- Patrones: Repository (pg)
-- Tecnologias: Node.js 22, Express, pg
-- Puerto: 8085
+### Microservicio: orders-service
+- **Puerto:** 8081
+- **Base de datos:** orders_db
+- **Responsabilidad:** CRUD de pedidos, confirmacion, cancelacion, asignacion
+- **Imagen Docker:** jonahbruzzi/orders-service:node
 
-## Frontend
+### Microservicio: inventory-service
+- **Puerto:** 8082
+- **Base de datos:** inventory_db
+- **Responsabilidad:** Control de stock, ajustes, ventas, alertas
+- **Imagen Docker:** jonahbruzzi/inventory-service:node
 
-### Sistema Interno (SPA)
-- Codigo: Frontend/
-- Descripcion: Aplicacion React SPA con Vite + TypeScript. Modulos: Dashboard, POS, Inventario, Pedidos, Despachos, Clientes, Reportes, Usuarios.
-- Patrones: Custom Hook (useApiQuery, useOperationalWorkspace), Adapter (api-adapters), Proxy (api-client), Composite (useOperationalWorkspace)
-- Tecnologias: React 19, Vite 6, TypeScript, Tailwind CSS
+### Microservicio: shipping-service
+- **Puerto:** 8084
+- **Base de datos:** shipping_db
+- **Responsabilidad:** Envios, tracking, codigo QR, confirmacion de entrega
+- **Imagen Docker:** jonahbruzzi/shipping-service:node
 
-### Landing Page
-- Codigo: Landing/
-- Descripcion: Landing page de SmartLogix. Secciones de Hero, Caracteristicas, Como Funciona, Planes, Demo y FAQ.
-- Patrones: Componentes atomicos
-- Tecnologias: Next.js 16, React 19, Tailwind CSS v4
-- URL: https://smartlogix-landing.vercel.app
+### Microservicio: notification-service
+- **Puerto:** 8085
+- **Base de datos:** notification_db
+- **Responsabilidad:** Persistencia y consulta de eventos de trazabilidad
+- **Imagen Docker:** jonahbruzzi/notification-service:node
+
+---
 
 ## Infraestructura
 
 ### Docker Compose
-- node.yml: Desarrollo con build local
-- vm.yml: VM con imagenes pre-built (Docker Hub)
-- optimized.yml: Produccion optimizado (1GB RAM)
-- prod.yml: Produccion completo con elasticmq
+- **node.yml:** Desarrollo con build local
+- **vm.yml:** Produccion con imagenes pre-built
+- **optimized.yml:** Optimizado para 1GB RAM
+- **prod.yml:** Produccion completo
 
-### Base de Datos
-- Motor: PostgreSQL 15 (Alpine)
-- Bases: orders_db, inventory_db, shipping_db, notification_db
-- Scripts: Backend/init-db.sql (creacion), Backend/seed.sql (datos de prueba)
+### Docker Hub
+- https://hub.docker.com/r/jonahbruzzi/orders-service
+- https://hub.docker.com/r/jonahbruzzi/inventory-service
+- https://hub.docker.com/r/jonahbruzzi/shipping-service
+- https://hub.docker.com/r/jonahbruzzi/notification-service
 
-### Mensajeria
-- Dev: ElasticMQ (imagen softwaremill/elasticmq)
-- Prod: AWS SQS
-- Colas: orders-queue, shipping-queue
-- Config: elasticmq.conf
+### VM Produccion
+- **IP:** 104.248.60.29
+- **Stack:** Docker Compose + Nginx + Node.js + PostgreSQL
