@@ -22,6 +22,10 @@ export default function Cta1() {
                             </p>
                         </div>
                         <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
+                            <a href="https://smartlogix-five.vercel.app" className="inline-flex items-center gap-2.5 bg-white text-brand-2 font-bold px-8 py-4 rounded-xl hover:bg-gray-100 hover:-translate-y-1 transition-all shadow-lg">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                                Acceder al Software
+                            </a>
                             <Link href="#demo" className="inline-flex items-center gap-2.5 bg-brand-1 text-brand-2 font-bold px-8 py-4 rounded-xl hover:bg-yellow-400 hover:-translate-y-1 transition-all shadow-lg shadow-brand-1/40">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                                 Solicitar Demo Gratis
