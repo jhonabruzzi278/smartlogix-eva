@@ -8,122 +8,103 @@ services:
       - POSTGRES_PASSWORD=admin123
     command: >
       postgres
-      -c shared_buffers=32MB
-      -c effective_cache_size=64MB
-      -c maintenance_work_mem=16MB
-      -c wal_buffers=2MB
+      -c shared_buffers=64MB
+      -c effective_cache_size=128MB
       -c max_connections=50
-      -c work_mem=1MB
-      -c max_wal_size=128MB
-      -c min_wal_size=32MB
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./Backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 
   orders-service:
     build:
       context: ./Backend
       dockerfile: orders-service/Dockerfile
-    image: jonahbruzzi/orders-service:node
     container_name: smartlogix-orders
     restart: unless-stopped
     environment:
       - DB_URL=postgresql://postgres:admin123@postgres-db:5432/orders_db
       - INVENTORY_SERVICE_URL=http://inventory-service:8082
       - SHIPPING_SERVICE_URL=http://shipping-service:8084
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
       - PORT=8081
+    ports:
+      - "8081:8081"
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 
   inventory-service:
     build:
       context: ./Backend
       dockerfile: inventory-service/Dockerfile
-    image: jonahbruzzi/inventory-service:node
     container_name: smartlogix-inventory
     restart: unless-stopped
     environment:
       - DB_URL=postgresql://postgres:admin123@postgres-db:5432/inventory_db
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
       - PORT=8082
+    ports:
+      - "8082:8082"
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 
   shipping-service:
     build:
       context: ./Backend
       dockerfile: shipping-service/Dockerfile
-    image: jonahbruzzi/shipping-service:node
     container_name: smartlogix-shipping
     restart: unless-stopped
     environment:
       - DB_URL=postgresql://postgres:admin123@postgres-db:5432/shipping_db
       - NOTIFICATION_SERVICE_URL=http://notification-service:8085
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
       - PORT=8084
+    ports:
+      - "8084:8084"
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 
   notification-service:
     build:
       context: ./Backend
       dockerfile: notification-service/Dockerfile
-    image: jonahbruzzi/notification-service:node
     container_name: smartlogix-notification
     restart: unless-stopped
     environment:
       - DB_URL=postgresql://postgres:admin123@postgres-db:5432/notification_db
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
       - PORT=8085
+    ports:
+      - "8085:8085"
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 
   api-gateway:
     image: nginx:alpine
     container_name: smartlogix-api-gateway
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./Backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -133,10 +114,6 @@ services:
       - notification-service
     networks:
       - smartlogix-net
-    deploy:
-      resources:
-        limits:
-          memory: 32M
 
 networks:
   smartlogix-net:

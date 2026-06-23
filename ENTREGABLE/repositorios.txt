@@ -171,11 +171,10 @@ TOTAL                  164    TODAS LAS METRICAS SOBRE 60%  OK
 ========================================================================
 INFRAESTRUCTURA
 ========================================================================
-- Docker Compose       (dev + prod)
+- Docker Desktop       (ejecucion local, todos los servicios)
+- Docker Compose       (orquestacion con docker-compose.yml)
 - PostgreSQL 15 Alpine (1 DB por microservicio, Database-per-Service pattern)
-- Docker Hub           (imagenes pre-build)
-- Vercel               (frontend deploy)
-- VM DigitalOcean      (backend: 104.248.60.29)
+- Vercel               (frontend deploy en produccion)
 
 
 ========================================================================
