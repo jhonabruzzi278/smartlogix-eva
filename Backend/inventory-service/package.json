@@ -3,13 +3,40 @@
   "version": "1.0.0",
   "private": true,
   "main": "src/index.js",
-  "scripts": { "start": "node src/index.js" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "pg": "^8.13.1",
-    "uuid": "^11.0.5",
-    "cors": "^2.8.5"
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/src/**/*.test.js"
+    ],
+    "modulePaths": ["<rootDir>/node_modules"],
+    "moduleNameMapper": {
+      "^\\.\\./shared/(.*)$": "<rootDir>/../shared/$1"
+    },
+    "coverageReporters": [
+      "text",
+      "html",
+      "lcov"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js"
+    ]
   }
 }

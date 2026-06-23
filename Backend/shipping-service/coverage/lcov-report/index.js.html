@@ -1,0 +1,346 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for index.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="prettify.css" />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="index.html">All files</a> index.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">85.71% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>60/70</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">86.66% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>26/30</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">75% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>6/8</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">86.44% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>51/59</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">﻿const { createApp } = require('../shared/app');
+const { validateShipmentBody, validateShipmentStage } = require('../shared/validate');
+const log = require('../shared/logger');
+&nbsp;
+const { app, pool, sendError, start } = createApp('shipping_db', process.env.PORT || 8084);
+const NOTIFICATION_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:8085';
+&nbsp;
+async function <span class="fstat-no" title="function not covered" >ensureTables(</span>) {
+<span class="cstat-no" title="statement not covered" >  await pool.query(`CREATE TABLE IF NOT EXISTS shipments (</span>
+    id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL, customer_id INTEGER NOT NULL,
+    sku VARCHAR(100) NOT NULL, quantity INTEGER NOT NULL, status VARCHAR(30) DEFAULT 'EN_PREPARACION',
+    tracking_number VARCHAR(20), created_at TIMESTAMP DEFAULT NOW(), shipped_at TIMESTAMP,
+    customer_code VARCHAR(20), recipient_rut VARCHAR(15), proof_of_delivery_image TEXT)`);
+<span class="cstat-no" title="statement not covered" >  await pool.query(`CREATE TABLE IF NOT EXISTS processed_events (event_type VARCHAR(64) NOT NULL, event_key VARCHAR(128) NOT NULL, processed_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (event_type, event_key))`);</span>
+}
+&nbsp;
+async function sendNotification(shipment, stage, message) {
+  try {
+    await fetch(`${NOTIFICATION_URL}/api/notifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: require('uuid').v4(), orderId: shipment.order_id, customerId: shipment.customer_id, stage, status: shipment.status, message, sourceService: 'shipping-service', audience: 'BOTH', occurredAt: new Date().toISOString() }) });
+  } catch (e) { log.error('Notification failed', { orderId: shipment.order_id, message: e.message }); }
+}
+&nbsp;
+app.get('/api/shipments', async (_req, res) =&gt; {
+  try { res.json((await pool.query('SELECT * FROM shipments ORDER BY created_at DESC')).rows); }
+  catch (err) { <span class="cstat-no" title="statement not covered" >sendError(res, 500, 'Failed', err); </span>}
+});
+&nbsp;
+app.get('/api/shipments/:orderId', async (req, res) =&gt; {
+  try {
+    const r = await pool.query('SELECT * FROM shipments WHERE order_id=$1', [req.params.orderId]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Envío no encontrado' });
+    res.json(r.rows[0]);
+  } catch (err) { <span class="cstat-no" title="statement not covered" >sendError(res, 500, 'Failed', err); </span>}
+});
+&nbsp;
+app.post('/api/shipments', async (req, res) =&gt; {
+  try {
+    const errors = validateShipmentBody(req.body);
+    if (errors.length) return res.status(400).json({ error: errors.join(', ') });
+    const { orderId, customerId, sku, quantity } = req.body;
+    if ((await pool.query('SELECT 1 FROM shipments WHERE order_id=$1', [orderId])).rows.length)
+      return res.status(409).json({ error: `Ya existe envío para orden ${orderId}` });
+    const tracking = 'TRACK-' + require('uuid').v4().substring(0, 8).toUpperCase();
+    const shipment = (await pool.query(`INSERT INTO shipments (order_id,customer_id,sku,quantity,status,tracking_number,created_at) VALUES ($1,$2,$3,$4,'EN_PREPARACION',$5,NOW()) RETURNING *`, [orderId, customerId, sku, quantity, tracking])).rows[0];
+    await sendNotification(shipment, 'SHIPMENT_CREATED', `Envío creado tracking ${tracking}`);
+    res.status(201).json(shipment);
+  } catch (err) { <span class="cstat-no" title="statement not covered" >sendError(res, 500, 'Failed to create shipment', err); </span>}
+});
+&nbsp;
+app.put('/api/shipments/:id/stage', async (req, res) =&gt; {
+  try {
+    const stageErr = validateShipmentStage((req.query.stage || '').toUpperCase());
+    if (stageErr.length) return res.status(400).json({ error: stageErr.join(', ') });
+    const stage = req.query.stage.toUpperCase();
+    const shipment = (await pool.query('SELECT * FROM shipments WHERE id=$1', [req.params.id])).rows[0];
+    if (!shipment) return res.status(404).json({ error: 'Envío no encontrado' });
+&nbsp;
+    let updated, notifStage, notifMsg;
+    if (stage === 'EN_REPARTO') {
+      updated = (await pool.query("UPDATE shipments SET status='EN_REPARTO',shipped_at=NOW() WHERE id=$1 RETURNING *", [req.params.id])).rows[0];
+      notifStage = 'SHIPMENT_IN_TRANSIT'; notifMsg = `Envío en reparto - ${updated.tracking_number}`;
+    } else if (stage === 'ENTREGADO') {
+      const p = req.body || <span class="branch-1 cbranch-no" title="branch not covered" >{};</span>
+      updated = (await pool.query("UPDATE shipments SET status='ENTREGADO',customer_code=$1,recipient_rut=$2 WHERE id=$3 RETURNING *", [p.customerCode||<span class="branch-1 cbranch-no" title="branch not covered" >'',</span> p.recipientRut||<span class="branch-1 cbranch-no" title="branch not covered" >'',</span> req.params.id])).rows[0];
+      notifStage = 'SHIPMENT_DELIVERED'; notifMsg = `Envío entregado - ${updated.tracking_number}`;
+    } else {
+      updated = (await pool.query('UPDATE shipments SET status=$1 WHERE id=$2 RETURNING *', [stage, req.params.id])).rows[0];
+      notifStage = 'SHIPMENT_CANCELLED'; notifMsg = `Envío cancelado - ${updated.tracking_number}`;
+    }
+    await sendNotification(updated, notifStage, notifMsg);
+    res.json(updated);
+  } catch (err) { <span class="cstat-no" title="statement not covered" >sendError(res, 500, 'Failed to change stage', err); </span>}
+});
+&nbsp;
+app.get('/api/shipments/:id/qr', async (req, res) =&gt; {
+  try {
+    const r = await pool.query('SELECT * FROM shipments WHERE id=$1', [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Envío no encontrado' });
+    res.json({ qrCode: 'SMARTLOGIX-' + r.rows[0].tracking_number });
+  } catch (err) { <span class="cstat-no" title="statement not covered" >sendError(res, 500, 'Failed', err); </span>}
+});
+&nbsp;
+<span class="missing-if-branch" title="if path not taken" >I</span>if (require.main === module) {
+<span class="cstat-no" title="statement not covered" >  (<span class="fstat-no" title="function not covered" >as</span>ync () =&gt; { <span class="cstat-no" title="statement not covered" >await ensureTables(); <span class="cstat-no" title="statement not covered" ></span>start(); </span>})();</span>
+}
+&nbsp;
+module.exports = { app };
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-06-23T18:27:57.749Z
+            </div>
+        <script src="prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="sorter.js"></script>
+        <script src="block-navigation.js"></script>
+    </body>
+</html>
+    

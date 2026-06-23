@@ -86,4 +86,8 @@ app.post('/api/sales', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to record sale', err); }
 });
 
-(async () => { await ensureTables(); start(); })();
+if (require.main === module) {
+  (async () => { await ensureTables(); start(); })();
+}
+
+module.exports = { app };

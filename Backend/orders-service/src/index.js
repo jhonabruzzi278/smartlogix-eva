@@ -143,4 +143,8 @@ app.delete('/api/customers/:id', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to delete customer', err); }
 });
 
-(async () => { await ensureTables(); start(); })();
+if (require.main === module) {
+  (async () => { await ensureTables(); start(); })();
+}
+
+module.exports = { app };

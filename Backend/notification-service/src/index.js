@@ -44,4 +44,8 @@ app.get('/api/notifications/audience/:audience', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed', err); }
 });
 
-(async () => { await ensureTables(); start(); })();
+if (require.main === module) {
+  (async () => { await ensureTables(); start(); })();
+}
+
+module.exports = { app };
