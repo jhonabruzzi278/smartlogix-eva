@@ -1,87 +1,188 @@
 Repositorios del proyecto SmartLogix — Evaluacion Parcial N°3
 ==============================================================
+Asignatura: DSY1106 — DESARROLLO FULLSTACK III
+Equipo: jhonabruzzi278
 
-Repositorio principal (desarrollo):
-  https://github.com/JONAHBRUZZI/smartlogix
-
-Repositorio de evaluacion (Eva2):
-  https://github.com/jhonabruzzi278/smartlogix-eva
-
-Este repositorio contiene la plataforma completa de gestion logistica SmartLogix.
-Incluye el frontend React (SPA + PWA), los 4 microservicios backend (Node.js/Express),
-la configuracion del BFF (Nginx API Gateway) y los archivos Docker Compose para
-despliegue en VM.
+NOTA: El proyecto es un monorepo. Todos los componentes estan en el mismo
+repositorio GitHub, organizados en carpetas separadas por dominio.
 
 
-Descripcion de cada componente dentro del repositorio:
-------------------------------------------------------
+========================================================================
+REPOSITORIO PRINCIPAL
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva
+Rama: main
 
-1. Frontend (React SPA)
-   Ruta en el repo: /Frontend/
-   Tecnologia: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui + PWA
-   Descripcion: Aplicacion web progresiva (PWA) para la gestion de pedidos,
-   inventario, envios, punto de venta, clientes y reportes.
-   Deploy: Vercel (https://smartlogix-five.vercel.app)
+Descripcion:
+  Repositorio de evaluacion que contiene la documentacion general del proyecto,
+  la arquitectura de microservicios, los archivos Docker Compose para
+  orquestacion de todos los servicios, y los guias de despliegue.
 
-2. BFF - API Gateway (Nginx)
-   Ruta en el repo: /Backend/nginx/
-   Tecnologia: Nginx Alpine
-   Descripcion: Reverse proxy que actua como punto unico de entrada a los
-   microservicios. Enruta /api/orders, /api/inventory, /api/shipments y
-   /api/notifications al servicio correspondiente.
-
-3. orders-service (Microservicio de Pedidos)
-   Ruta en el repo: /Backend/orders-service/
-   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
-   Puerto: 8081 | Base de datos: orders_db
-   Descripcion: Gestiona el ciclo de vida de los pedidos: creacion, confirmacion
-   (orquesta inventory + shipping), cancelacion, asignacion de transportista y
-   eliminacion.
-
-4. inventory-service (Microservicio de Inventario)
-   Ruta en el repo: /Backend/inventory-service/
-   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
-   Puerto: 8082 | Base de datos: inventory_db
-   Descripcion: Control de stock, catalogo de productos, ajustes atomicos de
-   inventario y registro de ventas.
-
-5. shipping-service (Microservicio de Envios)
-   Ruta en el repo: /Backend/shipping-service/
-   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
-   Puerto: 8084 | Base de datos: shipping_db
-   Descripcion: Gestion de envios, generacion de numeros de tracking, control de
-   etapas de despacho y notificacion de cambios al notification-service.
-
-6. notification-service (Microservicio de Trazabilidad)
-   Ruta en el repo: /Backend/notification-service/
-   Tecnologia: Node.js 22 + Express 4 + PostgreSQL
-   Puerto: 8085 | Base de datos: notification_db
-   Descripcion: Persistencia de eventos para trazabilidad y auditoria. Registra
-   cada cambio de estado en el flujo logistico.
+Contenido raiz:
+  /README.md               - Guia general del proyecto
+  /docker-compose.yml      - Orquestacion completa (dev)
+  /docker-compose.prod.yml - Orquestacion para produccion
+  /.env.example            - Variables de entorno requeridas
+  /ENTREGABLE/             - Documentacion de la rubrica
 
 
-Infraestructura:
-----------------
-- Docker Compose (desarrollo y produccion)
-- PostgreSQL 15 Alpine (1 base de datos por microservicio)
-- Docker Hub (imagenes pre-build para despliegue en VM)
-- Vercel (hosting del frontend)
-- VM DigitalOcean (hosting del backend en 104.248.60.29)
+========================================================================
+REPOSITORIO FRONTEND
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva/tree/main/Frontend
+Deploy: https://smartlogix-five.vercel.app
+
+Descripcion:
+  Aplicacion web progresiva (PWA) para la gestion logistica SmartLogix.
+  Interfaz para pedidos, inventario, envios, punto de venta, clientes y reportes.
+  Implementa RBAC con 5 roles de usuario.
+
+Tecnologias:
+  - React 18 + TypeScript 5.7
+  - Vite 6 + Tailwind CSS + shadcn/ui
+  - PWA (Progressive Web App)
+  - Testing: Vitest + @testing-library/react + @vitest/coverage-v8
+
+Instalacion y ejecucion:
+  cd Frontend
+  npm install
+  npm run dev          # Desarrollo (http://localhost:3000)
+  npm run build        # Build produccion
+  npm test             # Pruebas unitarias
+  npm run test:coverage # Pruebas + reporte de cobertura
 
 
-Documentacion de entregables (rubrica Parcial N°3):
-----------------------------------------------------
-- /ENTREGABLE/Documentacion/01-arquitectura.html       (imprimir a PDF: Diagrama de arquitectura)
-- /ENTREGABLE/Documentacion/02-persistencia.html       (imprimir a PDF: Descripcion de persistencia + SPs)
-- /ENTREGABLE/Documentacion/03-informe-pruebas.html    (imprimir a PDF: Informe de pruebas y cobertura)
-- /ENTREGABLE/SmartLogix-Postman-Collection.json       (Coleccion Postman importable)
-- /ENTREGABLE/repositorios.txt (este archivo)
+========================================================================
+REPOSITORIO BFF (API Gateway)
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva/tree/main/Backend/nginx
 
-Cobertura de pruebas unitarias (todas superan el umbral minimo del 60%):
---------------------------------------------------------------------------
-- Frontend            : 53 tests  | Statements 80.12% | Branches 76.29%
-- orders-service      : 42 tests  | Statements 83.58% | Branches 96.77%
-- inventory-service   : 33 tests  | Statements 78.16% | Branches 97.43%
-- shipping-service    : 20 tests  | Statements 85.71% | Branches 86.66%
-- notification-service: 16 tests  | Statements 73.68% | Branches 85.71%
-- TOTAL               : 164 tests | Todas las metricas sobre 60%
+Descripcion:
+  Nginx Alpine configurado como BFF (Backend For Frontend) / API Gateway.
+  Punto unico de entrada en el puerto 8080. Enruta por prefijo de path:
+    /api/orders       -> orders-service:8081
+    /api/inventory    -> inventory-service:8082
+    /api/shipments    -> shipping-service:8084
+    /api/notifications-> notification-service:8085
+
+
+========================================================================
+REPOSITORIO MICROSERVICIO: orders-service
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva/tree/main/Backend/orders-service
+Puerto: 8081 | BD: orders_db (PostgreSQL)
+
+Descripcion:
+  Microservicio de pedidos. Gestiona el ciclo de vida completo: creacion,
+  confirmacion (Saga: descuenta stock + crea envio), cancelacion y asignacion.
+  Incluye CRUD de clientes.
+
+Stored Procedures:
+  - fn_get_orders_with_customer(status?) - Reporte con JOIN a clientes
+  - fn_cancel_order(order_id, reason)    - Cancelacion atomica
+
+Pruebas: 42 tests | Statements 83.58% | Branches 96.77% (umbral: 60%)
+
+Instalacion:
+  cd Backend/orders-service
+  npm install
+  npm test             # Pruebas unitarias
+  npm test -- --coverage  # + Reporte HTML en coverage/index.html
+
+
+========================================================================
+REPOSITORIO MICROSERVICIO: inventory-service
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva/tree/main/Backend/inventory-service
+Puerto: 8082 | BD: inventory_db (PostgreSQL)
+
+Descripcion:
+  Microservicio de inventario. Catalogo de productos, control de stock
+  y registro de ventas. Usa stored procedures para operaciones atomicas.
+
+Stored Procedures:
+  - fn_adjust_stock(sku, delta)     - Ajuste atomico de stock
+  - fn_get_inventory_report()       - Reporte clasificado por nivel de stock
+
+Pruebas: 33 tests | Statements 78.16% | Branches 97.43% (umbral: 60%)
+
+Instalacion:
+  cd Backend/inventory-service
+  npm install
+  npm test
+  npm test -- --coverage
+
+
+========================================================================
+REPOSITORIO MICROSERVICIO: shipping-service
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva/tree/main/Backend/shipping-service
+Puerto: 8084 | BD: shipping_db (PostgreSQL)
+
+Descripcion:
+  Microservicio de envios. Genera numeros de tracking, controla etapas del
+  despacho (EN_PREPARACION > EN_REPARTO > ENTREGADO) y notifica al
+  notification-service en cada cambio de etapa.
+
+Pruebas: 20 tests | Statements 85.71% | Branches 86.66% (umbral: 60%)
+
+Instalacion:
+  cd Backend/shipping-service
+  npm install
+  npm test
+  npm test -- --coverage
+
+
+========================================================================
+REPOSITORIO MICROSERVICIO: notification-service
+========================================================================
+URL:  https://github.com/jhonabruzzi278/smartlogix-eva/tree/main/Backend/notification-service
+Puerto: 8085 | BD: notification_db (PostgreSQL)
+
+Descripcion:
+  Microservicio de trazabilidad y auditoria. Registra eventos del ciclo
+  logistico con idempotencia (eventId unico previene duplicados).
+
+Pruebas: 16 tests | Statements 73.68% | Branches 85.71% (umbral: 60%)
+
+Instalacion:
+  cd Backend/notification-service
+  npm install
+  npm test
+  npm test -- --coverage
+
+
+========================================================================
+RESUMEN DE COBERTURA DE PRUEBAS UNITARIAS
+========================================================================
+Umbral minimo requerido: 60% en todas las metricas
+
+Componente             Tests  Statements  Branches  Functions  Lines
+----------------------------------------------------------------------
+Frontend               53     80.12%      76.29%    77.27%     82.87%
+orders-service         42     83.58%      96.77%    82.35%     82.72%
+inventory-service      33     78.16%      97.43%    75.00%     78.37%
+shipping-service       20     85.71%      86.66%    75.00%     86.44%
+notification-service   16     73.68%      85.71%    60.00%     74.19%
+----------------------------------------------------------------------
+TOTAL                  164    TODAS LAS METRICAS SOBRE 60%  OK
+
+
+========================================================================
+INFRAESTRUCTURA
+========================================================================
+- Docker Compose       (dev + prod)
+- PostgreSQL 15 Alpine (1 DB por microservicio, Database-per-Service pattern)
+- Docker Hub           (imagenes pre-build)
+- Vercel               (frontend deploy)
+- VM DigitalOcean      (backend: 104.248.60.29)
+
+
+========================================================================
+ENTREGABLES DE LA RUBRICA (archivos en /ENTREGABLE/)
+========================================================================
+- Documentacion/01-arquitectura.html   -> PDF: Diagrama de arquitectura
+- Documentacion/02-persistencia.html   -> PDF: Descripcion de persistencia
+- Documentacion/03-informe-pruebas.html -> PDF: Informe de pruebas
+- SmartLogix-Postman-Collection.json   -> Coleccion Postman (28 endpoints)
+- repositorios.txt                     -> Este archivo

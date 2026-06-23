@@ -65,3 +65,33 @@ DB_URL=postgresql://postgres:postgres@localhost:5432/inventory_db node src/index
 | PORT | 8082 | Puerto HTTP |
 | DB_URL | postgresql://postgres:postgres@postgres-db:5432/inventory_db | Conexion BD |
 | ALLOWED_ORIGINS | * | CORS origins |
+
+## Pruebas Unitarias
+
+### Ejecutar pruebas
+
+```bash
+npm test
+```
+
+### Ejecutar con cobertura (genera reporte HTML)
+
+```bash
+npm test -- --coverage
+# Reporte generado en: coverage/index.html
+```
+
+### Ver reporte de cobertura
+
+Abrir `coverage/index.html` en el navegador.
+
+### Cobertura actual
+
+| Métrica    | Porcentaje |
+|------------|-----------|
+| Statements | ver coverage/index.html |
+| Branches   | ver coverage/index.html |
+| Functions  | ver coverage/index.html |
+| Lines      | ver coverage/index.html |
+
+Umbral mínimo configurado: **60%** en todas las métricas.

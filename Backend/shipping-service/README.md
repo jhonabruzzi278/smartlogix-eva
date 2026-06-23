@@ -74,3 +74,33 @@ DB_URL=postgresql://postgres:postgres@localhost:5432/shipping_db node src/index.
 | DB_URL | postgresql://postgres:postgres@postgres-db:5432/shipping_db | Conexion BD |
 | NOTIFICATION_SERVICE_URL | http://notification-service:8085 | URL del servicio de notificaciones |
 | ALLOWED_ORIGINS | * | CORS origins |
+
+## Pruebas Unitarias
+
+### Ejecutar pruebas
+
+```bash
+npm test
+```
+
+### Ejecutar con cobertura (genera reporte HTML)
+
+```bash
+npm test -- --coverage
+# Reporte generado en: coverage/index.html
+```
+
+### Ver reporte de cobertura
+
+Abrir `coverage/index.html` en el navegador.
+
+### Cobertura actual
+
+| Métrica    | Porcentaje |
+|------------|-----------|
+| Statements | ver coverage/index.html |
+| Branches   | ver coverage/index.html |
+| Functions  | ver coverage/index.html |
+| Lines      | ver coverage/index.html |
+
+Umbral mínimo configurado: **60%** en todas las métricas.
