@@ -92,6 +92,24 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/setup-tests.ts"],
-    css: false
+    css: false,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "./coverage",
+      exclude: [
+        "node_modules/**",
+        "dist/**",
+        "dev-dist/**",
+        "src/vite-env.d.ts",
+        "src/main.tsx",
+        "src/app/router.tsx",
+        "src/setup-tests.ts",
+        "**/*.d.ts",
+        "vite.config.ts",
+        "postcss.config.cjs",
+        "tailwind.config.ts"
+      ]
+    }
   }
 });

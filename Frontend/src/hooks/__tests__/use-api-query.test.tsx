@@ -49,7 +49,7 @@ describe("useApiQuery", () => {
       useApiQuery({ path: "/api/orders", transform: (d: ApiOrder[]) => d })
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toContain("Sesión expirada");
+    expect(result.current.error).toContain("Sesion expirada");
   });
 
   it("error 403 muestra permisos", async () => {
