@@ -188,12 +188,11 @@ describe('orders-service', () => {
     });
   });
 
-  describe('PUT /api/orders/:id/cancel', () => {
+  describe('PUT /api/orders/:id/cancel (usa fn_cancel_order)', () => {
     it('cancela orden en status CREATED sin restaurar stock', async () => {
       const cancelado = { ...mockOrder, status: 'CANCELADO', cancel_reason: 'Solicitud del cliente' };
       mockQuery
         .mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'CREATED' }] })
-        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [cancelado] });
       const res = await request(app).put('/api/orders/1/cancel').send({ reason: 'Solicitud del cliente' });
       expect(res.status).toBe(200);
@@ -201,11 +200,10 @@ describe('orders-service', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('cancela orden EN_PREPARACION y restaura stock', async () => {
+    it('cancela orden EN_PREPARACION, restaura stock y usa el SP', async () => {
       const cancelado = { ...mockOrder, status: 'CANCELADO' };
       mockQuery
         .mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'EN_PREPARACION' }] })
-        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [cancelado] });
       const res = await request(app).put('/api/orders/1/cancel').send({ reason: '' });
       expect(res.status).toBe(200);
@@ -216,6 +214,36 @@ describe('orders-service', () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).put('/api/orders/999/cancel').send({ reason: '' });
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/orders/report (usa fn_get_orders_with_customer)', () => {
+    it('retorna reporte de órdenes con datos de cliente', async () => {
+      const mockReport = [{
+        order_id: 1, customer_name: 'Juan Perez', customer_email: 'juan@test.com',
+        sku: 'COCA-2L', quantity: 5, status: 'CREATED',
+        created_at: new Date().toISOString(), assigned_to: null
+      }];
+      mockQuery.mockResolvedValueOnce({ rows: mockReport });
+      const res = await request(app).get('/api/orders/report');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].customer_name).toBe('Juan Perez');
+      expect(res.body[0].order_id).toBe(1);
+    });
+
+    it('filtra órdenes por status', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/orders/report?status=CANCELADO');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('retorna array vacío si no hay órdenes', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/orders/report');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
     });
   });
 

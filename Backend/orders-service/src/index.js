@@ -17,7 +17,43 @@ async function ensureTables() {
     address VARCHAR(300), email VARCHAR(200), created_at TIMESTAMP DEFAULT NOW())`);
 }
 
+async function ensureProcedures() {
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION fn_get_orders_with_customer(p_status TEXT DEFAULT NULL)
+    RETURNS TABLE(order_id INT, customer_name VARCHAR, customer_email VARCHAR,
+                  sku VARCHAR, quantity INT, status VARCHAR, created_at TIMESTAMP, assigned_to VARCHAR)
+    AS $fn$
+    BEGIN
+      RETURN QUERY
+        SELECT o.id, COALESCE(c.name,'Sin cliente'), COALESCE(c.email,''),
+               o.sku, o.quantity, o.status, o.created_at, o.assigned_to
+        FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+        WHERE p_status IS NULL OR o.status = p_status
+        ORDER BY o.created_at DESC;
+    END;
+    $fn$ LANGUAGE plpgsql;
+  `);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION fn_cancel_order(p_order_id INT, p_reason TEXT DEFAULT '')
+    RETURNS SETOF orders AS $fn$
+    BEGIN
+      UPDATE orders SET status = 'CANCELADO', cancel_reason = p_reason
+      WHERE id = p_order_id AND status <> 'CANCELADO';
+      RETURN QUERY SELECT * FROM orders WHERE id = p_order_id;
+    END;
+    $fn$ LANGUAGE plpgsql;
+  `);
+}
+
 app.get('/api/orders/test', (_req, res) => res.send('orders-service UP'));
+
+app.get('/api/orders/report', async (req, res) => {
+  try {
+    const status = req.query.status ? req.query.status.toUpperCase() : null;
+    const r = await pool.query('SELECT * FROM fn_get_orders_with_customer($1)', [status]);
+    res.json(r.rows);
+  } catch (err) { sendError(res, 500, 'Failed to get orders report', err); }
+});
 
 app.post('/api/orders', async (req, res) => {
   try {
@@ -75,8 +111,8 @@ app.put('/api/orders/:id/cancel', async (req, res) => {
       try { await interServiceFetch(`${INVENTORY_URL}/api/inventory/${order.sku}/adjust?delta=+${order.quantity}`, { method: 'POST' }); }
       catch (e) { log.error('Stock restore failed', { orderId: req.params.id, message: e.message }); }
     }
-    await pool.query("UPDATE orders SET status='CANCELADO', cancel_reason=$1 WHERE id=$2", [reason, req.params.id]);
-    res.json((await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.id])).rows[0]);
+    const cancelled = (await pool.query('SELECT * FROM fn_cancel_order($1,$2)', [req.params.id, reason])).rows[0];
+    res.json(cancelled);
   } catch (err) { sendError(res, 500, 'Failed to cancel order', err); }
 });
 
@@ -144,7 +180,7 @@ app.delete('/api/customers/:id', async (req, res) => {
 });
 
 if (require.main === module) {
-  (async () => { await ensureTables(); start(); })();
+  (async () => { await ensureTables(); await ensureProcedures(); start(); })();
 }
 
 module.exports = { app };

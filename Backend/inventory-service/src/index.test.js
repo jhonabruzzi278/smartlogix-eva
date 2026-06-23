@@ -153,9 +153,16 @@ describe('inventory-service', () => {
     });
   });
 
-  describe('POST /api/inventory/:sku/adjust', () => {
+  describe('POST /api/inventory/:sku/adjust (usa fn_adjust_stock)', () => {
+    const spOk = (sku, stock, delta) => ({
+      sku_out: sku, new_stock: stock, delta, success: true, error_msg: null
+    });
+    const spFail = (sku, delta, msg) => ({
+      sku_out: sku, new_stock: null, delta, success: false, error_msg: msg
+    });
+
     it('incrementa stock correctamente (delta positivo)', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [{ ...mockProduct, stock: 60 }] });
+      mockQuery.mockResolvedValueOnce({ rows: [spOk('COCA-2L', 60, 10)] });
       const res = await request(app).post('/api/inventory/COCA-2L/adjust?delta=10');
       expect(res.status).toBe(200);
       expect(res.body.delta).toBe(10);
@@ -164,7 +171,7 @@ describe('inventory-service', () => {
 
     it('decrementa stock y registra venta (delta negativo)', async () => {
       mockQuery
-        .mockResolvedValueOnce({ rows: [{ ...mockProduct, stock: 45 }] })
+        .mockResolvedValueOnce({ rows: [spOk('COCA-2L', 45, -5)] })
         .mockResolvedValueOnce({ rows: [] });
       const res = await request(app).post('/api/inventory/COCA-2L/adjust?delta=-5');
       expect(res.status).toBe(200);
@@ -172,7 +179,7 @@ describe('inventory-service', () => {
       expect(res.body.stock).toBe(45);
     });
 
-    it('rechaza delta cero', async () => {
+    it('rechaza delta cero (sin llamar al SP)', async () => {
       const res = await request(app).post('/api/inventory/COCA-2L/adjust?delta=0');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/non-zero/i);
@@ -183,22 +190,41 @@ describe('inventory-service', () => {
       expect(res.status).toBe(400);
     });
 
-    it('retorna 400 si stock insuficiente (SKU existe pero no alcanza)', async () => {
-      mockQuery
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    it('retorna 400 si stock insuficiente (SP retorna success=false)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [spFail('COCA-2L', -100, 'Stock insuficiente')] });
       const res = await request(app).post('/api/inventory/COCA-2L/adjust?delta=-100');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/insuficiente/i);
     });
 
-    it('retorna 404 si SKU no existe al descontar', async () => {
-      mockQuery
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] });
+    it('retorna 404 si SKU no existe (SP retorna success=false)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [spFail('NO-EXISTE', -5, 'SKU no encontrado')] });
       const res = await request(app).post('/api/inventory/NO-EXISTE/adjust?delta=-5');
       expect(res.status).toBe(404);
       expect(res.body.error).toMatch(/no encontrado/i);
+    });
+  });
+
+  describe('GET /api/inventory/report (usa fn_get_inventory_report)', () => {
+    it('retorna reporte con clasificación de stock', async () => {
+      const mockReport = [
+        { sku: 'COCA-2L', stock: 0, stock_level: 'SIN_STOCK' },
+        { sku: 'AGUA-500', stock: 5, stock_level: 'CRITICO' },
+        { sku: 'JUGO-1L', stock: 50, stock_level: 'NORMAL' }
+      ];
+      mockQuery.mockResolvedValueOnce({ rows: mockReport });
+      const res = await request(app).get('/api/inventory/report');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(3);
+      expect(res.body[0].stock_level).toBe('SIN_STOCK');
+      expect(res.body[2].stock_level).toBe('NORMAL');
+    });
+
+    it('retorna array vacío si no hay inventario', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/inventory/report');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
     });
   });
 

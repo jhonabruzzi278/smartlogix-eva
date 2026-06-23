@@ -11,9 +11,49 @@ async function ensureTables() {
   await pool.query(`CREATE TABLE IF NOT EXISTS processed_events (event_type VARCHAR(64) NOT NULL, event_key VARCHAR(128) NOT NULL, processed_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (event_type, event_key))`);
 }
 
+async function ensureProcedures() {
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION fn_adjust_stock(p_sku TEXT, p_delta INT)
+    RETURNS TABLE(sku_out TEXT, new_stock INT, delta INT, success BOOLEAN, error_msg TEXT)
+    AS $fn$
+    DECLARE v_new_stock INT; v_exists BOOLEAN;
+    BEGIN
+      SELECT EXISTS(SELECT 1 FROM inventory WHERE sku = p_sku) INTO v_exists;
+      IF NOT v_exists THEN
+        RETURN QUERY SELECT p_sku, NULL::INT, p_delta, FALSE, 'SKU no encontrado'::TEXT; RETURN;
+      END IF;
+      UPDATE inventory SET stock = stock + p_delta WHERE sku = p_sku AND stock + p_delta >= 0 RETURNING stock INTO v_new_stock;
+      IF v_new_stock IS NOT NULL THEN
+        RETURN QUERY SELECT p_sku, v_new_stock, p_delta, TRUE, NULL::TEXT;
+      ELSE
+        RETURN QUERY SELECT p_sku, NULL::INT, p_delta, FALSE, 'Stock insuficiente'::TEXT;
+      END IF;
+    END;
+    $fn$ LANGUAGE plpgsql;
+  `);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION fn_get_inventory_report()
+    RETURNS TABLE(sku VARCHAR, stock INT, stock_level TEXT)
+    AS $fn$
+    BEGIN
+      RETURN QUERY
+        SELECT i.sku, i.stock,
+          CASE WHEN i.stock = 0 THEN 'SIN_STOCK' WHEN i.stock < 10 THEN 'CRITICO'
+               WHEN i.stock < 30 THEN 'BAJO' ELSE 'NORMAL' END::TEXT
+        FROM inventory i ORDER BY i.stock ASC;
+    END;
+    $fn$ LANGUAGE plpgsql;
+  `);
+}
+
 app.get('/api/inventory', async (_req, res) => {
   try { res.json((await pool.query('SELECT * FROM inventory ORDER BY id')).rows); }
   catch (err) { sendError(res, 500, 'Failed to list inventory', err); }
+});
+
+app.get('/api/inventory/report', async (_req, res) => {
+  try { res.json((await pool.query('SELECT * FROM fn_get_inventory_report()')).rows); }
+  catch (err) { sendError(res, 500, 'Failed to get inventory report', err); }
 });
 
 app.get('/api/inventory/:sku', async (req, res) => {
@@ -57,13 +97,14 @@ app.post('/api/inventory/:sku/adjust', async (req, res) => {
   try {
     const delta = parseInt(req.query.delta, 10);
     if (isNaN(delta) || delta === 0) return res.status(400).json({ error: 'delta must be non-zero integer' });
-    const r = await pool.query('UPDATE inventory SET stock=stock+$1 WHERE sku=$2 AND stock+$1>=0 RETURNING *', [delta, req.params.sku]);
-    if (!r.rows.length) {
-      const exists = await pool.query('SELECT 1 FROM inventory WHERE sku=$1', [req.params.sku]);
-      return res.status(exists.rows.length ? 400 : 404).json({ error: exists.rows.length ? 'Stock insuficiente' : 'SKU no encontrado' });
+    const r = await pool.query('SELECT * FROM fn_adjust_stock($1,$2)', [req.params.sku, delta]);
+    const result = r.rows[0];
+    if (!result.success) {
+      const status = result.error_msg === 'SKU no encontrado' ? 404 : 400;
+      return res.status(status).json({ error: result.error_msg });
     }
     if (delta < 0) await pool.query('INSERT INTO sales (sku, quantity) VALUES ($1,$2)', [req.params.sku, Math.abs(delta)]);
-    res.json({ sku: req.params.sku, stock: r.rows[0].stock, delta });
+    res.json({ sku: req.params.sku, stock: result.new_stock, delta });
   } catch (err) { sendError(res, 500, 'Failed to adjust stock', err); }
 });
 
@@ -87,7 +128,7 @@ app.post('/api/sales', async (req, res) => {
 });
 
 if (require.main === module) {
-  (async () => { await ensureTables(); start(); })();
+  (async () => { await ensureTables(); await ensureProcedures(); start(); })();
 }
 
 module.exports = { app };
