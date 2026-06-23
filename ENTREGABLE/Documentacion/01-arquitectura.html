@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SmartLogix - Arquitectura de Microservicios</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; background: #fff; padding: 32px; }
+  h1 { font-size: 26px; color: #0f3460; border-bottom: 3px solid #e94560; padding-bottom: 10px; margin-bottom: 6px; }
+  h2 { font-size: 17px; color: #16213e; margin: 24px 0 10px; border-left: 4px solid #e94560; padding-left: 10px; }
+  h3 { font-size: 14px; color: #0f3460; margin: 14px 0 6px; }
+  p, li { font-size: 13px; line-height: 1.6; color: #333; }
+  ul { padding-left: 18px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 28px; }
+  .diagram-wrap { display: flex; justify-content: center; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th { background: #0f3460; color: #fff; padding: 8px 12px; text-align: left; font-weight: 600; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .badge-node { background: #d4edda; color: #155724; }
+  .badge-react { background: #cce5ff; color: #004085; }
+  .badge-pg { background: #fff3cd; color: #856404; }
+  .badge-nginx { background: #f8d7da; color: #721c24; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+  .card { border: 1px solid #dde3ec; border-radius: 8px; padding: 14px; background: #f7f9fc; }
+  .card-title { font-weight: 700; font-size: 13px; color: #0f3460; margin-bottom: 6px; }
+  .flow-step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .step-num { min-width: 24px; height: 24px; border-radius: 50%; background: #0f3460; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  footer { margin-top: 36px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; text-align: center; }
+  @media print {
+    body { padding: 20px; }
+    @page { margin: 1.5cm; size: A4; }
+    .page-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<h1>SmartLogix — Arquitectura de Microservicios</h1>
+<p class="subtitle">Evaluación Parcial N°3 &nbsp;|&nbsp; Fecha: Junio 2026 &nbsp;|&nbsp; Plataforma logística distribuida</p>
+
+<h2>1. Diagrama de Arquitectura</h2>
+<div class="diagram-wrap">
+<svg width="780" height="540" viewBox="0 0 780 540" xmlns="http://www.w3.org/2000/svg" style="font-family:'Segoe UI',Arial,sans-serif;">
+  <!-- Background -->
+  <rect width="780" height="540" fill="#f0f4f8" rx="12"/>
+
+  <!-- Title band -->
+  <rect x="0" y="0" width="780" height="40" fill="#0f3460" rx="12"/>
+  <rect x="0" y="30" width="780" height="10" fill="#0f3460"/>
+  <text x="390" y="26" text-anchor="middle" fill="white" font-size="15" font-weight="700">SMARTLOGIX — ARQUITECTURA DE MICROSERVICIOS</text>
+
+  <!-- Internet/Client -->
+  <rect x="30" y="68" width="130" height="70" rx="8" fill="#16213e" stroke="#e94560" stroke-width="2"/>
+  <text x="95" y="92" text-anchor="middle" fill="white" font-size="11" font-weight="700">CLIENTE</text>
+  <text x="95" y="108" text-anchor="middle" fill="#a0b4d0" font-size="10">Browser / Mobile</text>
+  <text x="95" y="125" text-anchor="middle" fill="#e94560" font-size="10">PWA</text>
+
+  <!-- Arrow: Client → Frontend -->
+  <line x1="160" y1="103" x2="196" y2="103" stroke="#e94560" stroke-width="2" marker-end="url(#arr-red)"/>
+  <text x="178" y="97" text-anchor="middle" fill="#e94560" font-size="9">HTTPS</text>
+
+  <!-- Frontend -->
+  <rect x="196" y="56" width="150" height="94" rx="8" fill="#1a4a8a" stroke="#4da6ff" stroke-width="2"/>
+  <text x="271" y="80" text-anchor="middle" fill="white" font-size="12" font-weight="700">FRONTEND</text>
+  <text x="271" y="96" text-anchor="middle" fill="#a0c4ff" font-size="10">React 18 + TypeScript</text>
+  <text x="271" y="110" text-anchor="middle" fill="#a0c4ff" font-size="10">Vite + Tailwind + shadcn</text>
+  <text x="271" y="126" text-anchor="middle" fill="#4da6ff" font-size="10">PWA + RBAC (5 roles)</text>
+  <text x="271" y="140" text-anchor="middle" fill="#a0c4ff" font-size="10">Vercel Deploy</text>
+
+  <!-- Arrow: Frontend → BFF -->
+  <line x1="346" y1="103" x2="384" y2="103" stroke="#4da6ff" stroke-width="2" marker-end="url(#arr-blue)"/>
+  <text x="365" y="97" text-anchor="middle" fill="#4da6ff" font-size="9">/api/*</text>
+
+  <!-- Nginx BFF -->
+  <rect x="384" y="56" width="150" height="94" rx="8" fill="#8b1a1a" stroke="#ff6b6b" stroke-width="2"/>
+  <text x="459" y="80" text-anchor="middle" fill="white" font-size="12" font-weight="700">NGINX BFF</text>
+  <text x="459" y="96" text-anchor="middle" fill="#ffaaaa" font-size="10">API Gateway :8080</text>
+  <text x="459" y="112" text-anchor="middle" fill="#ffaaaa" font-size="10">Reverse Proxy</text>
+  <text x="459" y="128" text-anchor="middle" fill="#ffaaaa" font-size="10">Path-based routing</text>
+  <text x="459" y="144" text-anchor="middle" fill="#ff6b6b" font-size="10">Load Balancing</text>
+
+  <!-- Routing lines from BFF to services -->
+  <!-- Down from BFF center to horizontal line -->
+  <line x1="459" y1="150" x2="459" y2="190" stroke="#666" stroke-width="1.5" stroke-dasharray="5,3"/>
+
+  <!-- Horizontal line connecting all services -->
+  <line x1="95" y1="220" x2="695" y2="220" stroke="#999" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Vertical drops to each service -->
+  <line x1="459" y1="190" x2="95" y2="220" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="459" y1="190" x2="285" y2="220" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="459" y1="190" x2="510" y2="220" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="459" y1="190" x2="685" y2="220" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3"/>
+
+  <!-- Route labels -->
+  <text x="95" y="212" text-anchor="middle" fill="#0f3460" font-size="9" font-weight="700">/api/orders</text>
+  <text x="285" y="212" text-anchor="middle" fill="#0f3460" font-size="9" font-weight="700">/api/inventory</text>
+  <text x="510" y="212" text-anchor="middle" fill="#0f3460" font-size="9" font-weight="700">/api/shipments</text>
+  <text x="685" y="212" text-anchor="middle" fill="#0f3460" font-size="9" font-weight="700">/api/notifications</text>
+
+  <!-- orders-service -->
+  <rect x="30" y="230" width="130" height="90" rx="8" fill="#1b5e20" stroke="#66bb6a" stroke-width="2"/>
+  <text x="95" y="252" text-anchor="middle" fill="white" font-size="11" font-weight="700">orders-service</text>
+  <text x="95" y="267" text-anchor="middle" fill="#a5d6a7" font-size="10">Node.js + Express</text>
+  <text x="95" y="282" text-anchor="middle" fill="#a5d6a7" font-size="10">:8081</text>
+  <text x="95" y="297" text-anchor="middle" fill="#66bb6a" font-size="10">Saga Pattern</text>
+  <text x="95" y="311" text-anchor="middle" fill="#a5d6a7" font-size="10">orders_db</text>
+
+  <!-- inventory-service -->
+  <rect x="220" y="230" width="130" height="90" rx="8" fill="#0d47a1" stroke="#64b5f6" stroke-width="2"/>
+  <text x="285" y="252" text-anchor="middle" fill="white" font-size="11" font-weight="700">inventory-service</text>
+  <text x="285" y="267" text-anchor="middle" fill="#bbdefb" font-size="10">Node.js + Express</text>
+  <text x="285" y="282" text-anchor="middle" fill="#bbdefb" font-size="10">:8082</text>
+  <text x="285" y="297" text-anchor="middle" fill="#64b5f6" font-size="10">SP: fn_adjust_stock</text>
+  <text x="285" y="311" text-anchor="middle" fill="#bbdefb" font-size="10">inventory_db</text>
+
+  <!-- shipping-service -->
+  <rect x="445" y="230" width="130" height="90" rx="8" fill="#4a148c" stroke="#ce93d8" stroke-width="2"/>
+  <text x="510" y="252" text-anchor="middle" fill="white" font-size="11" font-weight="700">shipping-service</text>
+  <text x="510" y="267" text-anchor="middle" fill="#e1bee7" font-size="10">Node.js + Express</text>
+  <text x="510" y="282" text-anchor="middle" fill="#e1bee7" font-size="10">:8084</text>
+  <text x="510" y="297" text-anchor="middle" fill="#ce93d8" font-size="10">QR + Tracking</text>
+  <text x="510" y="311" text-anchor="middle" fill="#e1bee7" font-size="10">shipping_db</text>
+
+  <!-- notification-service -->
+  <rect x="620" y="230" width="130" height="90" rx="8" fill="#b71c1c" stroke="#ef9a9a" stroke-width="2"/>
+  <text x="685" y="252" text-anchor="middle" fill="white" font-size="11" font-weight="700">notification-svc</text>
+  <text x="685" y="267" text-anchor="middle" fill="#ffcdd2" font-size="10">Node.js + Express</text>
+  <text x="685" y="282" text-anchor="middle" fill="#ffcdd2" font-size="10">:8085</text>
+  <text x="685" y="297" text-anchor="middle" fill="#ef9a9a" font-size="10">Idempotency</text>
+  <text x="685" y="311" text-anchor="middle" fill="#ffcdd2" font-size="10">notification_db</text>
+
+  <!-- Inter-service arrows (saga flow) -->
+  <!-- orders → inventory (adjust) -->
+  <line x1="160" y1="262" x2="220" y2="262" stroke="#ffcc00" stroke-width="2" marker-end="url(#arr-yellow)"/>
+  <text x="190" y="256" text-anchor="middle" fill="#b8860b" font-size="9">adjust</text>
+  <!-- orders → shipping (create) -->
+  <path d="M 95 320 Q 95 360 510 360 L 510 320" fill="none" stroke="#ffcc00" stroke-width="2" marker-end="url(#arr-yellow)" stroke-dasharray="6,3"/>
+  <text x="300" y="375" text-anchor="middle" fill="#b8860b" font-size="9">create shipment</text>
+  <!-- shipping → notification -->
+  <line x1="575" y1="280" x2="620" y2="280" stroke="#ff9800" stroke-width="2" marker-end="url(#arr-orange)"/>
+  <text x="598" y="274" text-anchor="middle" fill="#b8600a" font-size="9">notify</text>
+
+  <!-- Databases row -->
+  <!-- orders_db -->
+  <ellipse cx="95" cy="440" rx="55" ry="22" fill="#fff9c4" stroke="#f9a825" stroke-width="2"/>
+  <text x="95" y="435" text-anchor="middle" fill="#5d4037" font-size="10" font-weight="700">orders_db</text>
+  <text x="95" y="448" text-anchor="middle" fill="#795548" font-size="9">PostgreSQL</text>
+  <line x1="95" y1="320" x2="95" y2="418" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- inventory_db -->
+  <ellipse cx="285" cy="440" rx="55" ry="22" fill="#fff9c4" stroke="#f9a825" stroke-width="2"/>
+  <text x="285" y="435" text-anchor="middle" fill="#5d4037" font-size="10" font-weight="700">inventory_db</text>
+  <text x="285" y="448" text-anchor="middle" fill="#795548" font-size="9">PostgreSQL</text>
+  <line x1="285" y1="320" x2="285" y2="418" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- shipping_db -->
+  <ellipse cx="510" cy="440" rx="55" ry="22" fill="#fff9c4" stroke="#f9a825" stroke-width="2"/>
+  <text x="510" y="435" text-anchor="middle" fill="#5d4037" font-size="10" font-weight="700">shipping_db</text>
+  <text x="510" y="448" text-anchor="middle" fill="#795548" font-size="9">PostgreSQL</text>
+  <line x1="510" y1="320" x2="510" y2="418" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- notification_db -->
+  <ellipse cx="685" cy="440" rx="55" ry="22" fill="#fff9c4" stroke="#f9a825" stroke-width="2"/>
+  <text x="685" y="435" text-anchor="middle" fill="#5d4037" font-size="10" font-weight="700">notification_db</text>
+  <text x="685" y="448" text-anchor="middle" fill="#795548" font-size="9">PostgreSQL</text>
+  <line x1="685" y1="320" x2="685" y2="418" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Legend -->
+  <rect x="30" y="480" width="720" height="46" rx="6" fill="white" stroke="#ddd" stroke-width="1"/>
+  <line x1="50" y1="504" x2="80" y2="504" stroke="#4da6ff" stroke-width="2"/>
+  <text x="84" y="508" fill="#333" font-size="10">HTTP / REST</text>
+  <line x1="150" y1="504" x2="180" y2="504" stroke="#ffcc00" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="184" y="508" fill="#333" font-size="10">Inter-service call (Saga)</text>
+  <line x1="330" y1="504" x2="360" y2="504" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="364" y="508" fill="#333" font-size="10">DB Connection (pg pool)</text>
+  <rect x="510" y="497" width="14" height="14" rx="3" fill="#1b5e20"/>
+  <text x="528" y="508" fill="#333" font-size="10">Microservicio Node.js</text>
+  <ellipse cx="636" cy="503" rx="18" ry="8" fill="#fff9c4" stroke="#f9a825" stroke-width="1.5"/>
+  <text x="658" y="508" fill="#333" font-size="10">PostgreSQL DB</text>
+
+  <!-- Arrowhead markers -->
+  <defs>
+    <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#e94560"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4da6ff"/>
+    </marker>
+    <marker id="arr-yellow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#ffcc00"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#ff9800"/>
+    </marker>
+  </defs>
+</svg>
+</div>
+
+<h2>2. Descripción de Componentes</h2>
+<table>
+  <thead><tr><th>Componente</th><th>Tecnología</th><th>Puerto</th><th>Responsabilidad</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Frontend</strong></td><td><span class="badge badge-react">React 18 + TS + Vite</span></td><td>—</td><td>SPA + PWA con RBAC (5 roles). Consume el BFF vía REST.</td></tr>
+    <tr><td><strong>Nginx BFF</strong></td><td><span class="badge badge-nginx">Nginx Alpine</span></td><td>8080</td><td>API Gateway: enruta por prefijo de path, punto único de entrada.</td></tr>
+    <tr><td><strong>orders-service</strong></td><td><span class="badge badge-node">Node.js + Express</span></td><td>8081</td><td>Ciclo de vida de pedidos. Orquesta Saga: descuento de inventario + creación de envío.</td></tr>
+    <tr><td><strong>inventory-service</strong></td><td><span class="badge badge-node">Node.js + Express</span></td><td>8082</td><td>Catálogo de productos, control de stock, registro de ventas.</td></tr>
+    <tr><td><strong>shipping-service</strong></td><td><span class="badge badge-node">Node.js + Express</span></td><td>8084</td><td>Gestión de envíos, tracking, etapas de despacho. Notifica al notification-service.</td></tr>
+    <tr><td><strong>notification-service</strong></td><td><span class="badge badge-node">Node.js + Express</span></td><td>8085</td><td>Trazabilidad de eventos. Recibe notificaciones con idempotencia (eventId único).</td></tr>
+    <tr><td><strong>PostgreSQL</strong></td><td><span class="badge badge-pg">PostgreSQL 15</span></td><td>5432</td><td>1 base de datos por microservicio (Database-per-Service pattern).</td></tr>
+  </tbody>
+</table>
+
+<h2>3. Patrones de Diseño Aplicados</h2>
+<div class="grid2">
+  <div class="card">
+    <div class="card-title">BFF (Backend For Frontend)</div>
+    <p>Nginx actúa como API Gateway unificado. El frontend hace todas las peticiones a un único host (:8080) y Nginx enruta por prefijo: <code>/api/orders→8081</code>, <code>/api/inventory→8082</code>, <code>/api/shipments→8084</code>, <code>/api/notifications→8085</code>.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Saga (Orquestación)</div>
+    <p>Al confirmar un pedido (<code>PUT /api/orders/:id/confirm</code>), orders-service orquesta en secuencia: (1) descuenta inventario, (2) crea envío en shipping-service. Los errores en pasos intermedios se registran como <em>warnings</em> sin revertir los pasos anteriores.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Database-per-Service</div>
+    <p>Cada microservicio tiene su propia base de datos PostgreSQL (<code>orders_db</code>, <code>inventory_db</code>, <code>shipping_db</code>, <code>notification_db</code>). No hay acceso cruzado entre bases de datos.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Repository + Shared Module</div>
+    <p>El módulo <code>Backend/shared/</code> centraliza: creación del pool de conexiones (<code>db.js</code>), configuración de seguridad (<code>security.js</code>), logger (<code>logger.js</code>), validadores (<code>validate.js</code>) y el helper <code>interServiceFetch</code>.</p>
+  </div>
+</div>
+
+<h2>4. Flujo de Confirmación de Pedido (Saga)</h2>
+<div class="flow-step"><div class="step-num">1</div><p><strong>Frontend</strong> envía <code>PUT /api/orders/:id/confirm</code> al BFF.</p></div>
+<div class="flow-step"><div class="step-num">2</div><p><strong>orders-service</strong> consulta el pedido en <code>orders_db</code>.</p></div>
+<div class="flow-step"><div class="step-num">3</div><p><strong>orders-service → inventory-service</strong>: <code>POST /api/inventory/:sku/adjust?delta=-qty</code> para descontar stock.</p></div>
+<div class="flow-step"><div class="step-num">4</div><p><strong>orders-service → shipping-service</strong>: <code>POST /api/shipments</code> para crear el envío con número de tracking.</p></div>
+<div class="flow-step"><div class="step-num">5</div><p><strong>shipping-service → notification-service</strong>: <code>POST /api/notifications</code> con el evento <code>SHIPMENT_CREATED</code>.</p></div>
+<div class="flow-step"><div class="step-num">6</div><p><strong>orders-service</strong> actualiza el status del pedido a <code>EN_PREPARACION</code> y responde al frontend.</p></div>
+
+<footer>SmartLogix — Arquitectura de Microservicios &nbsp;|&nbsp; Evaluación Parcial N°3 &nbsp;|&nbsp; 2026</footer>
+</body>
+</html>

@@ -1,0 +1,376 @@
+{
+  "info": {
+    "_postman_id": "smartlogix-eva2-collection",
+    "name": "SmartLogix API — Microservicios Eva2",
+    "description": "Colección completa de endpoints REST para la plataforma SmartLogix. BFF Nginx en :8080, microservicios en :8081-:8085.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "BASE_URL", "value": "http://localhost:8080", "type": "string", "description": "BFF Nginx" },
+    { "key": "ORDERS_URL", "value": "http://localhost:8081", "type": "string" },
+    { "key": "INVENTORY_URL", "value": "http://localhost:8082", "type": "string" },
+    { "key": "SHIPPING_URL", "value": "http://localhost:8084", "type": "string" },
+    { "key": "NOTIFICATION_URL", "value": "http://localhost:8085", "type": "string" },
+    { "key": "orderId", "value": "1", "type": "string" },
+    { "key": "customerId", "value": "1", "type": "string" },
+    { "key": "sku", "value": "COCA-2L", "type": "string" },
+    { "key": "shipmentId", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Health - orders-service",
+          "request": {
+            "method": "GET",
+            "url": "{{ORDERS_URL}}/health",
+            "description": "Verifica estado del orders-service y conexión a orders_db"
+          }
+        },
+        {
+          "name": "Health - inventory-service",
+          "request": {
+            "method": "GET",
+            "url": "{{INVENTORY_URL}}/health",
+            "description": "Verifica estado del inventory-service y conexión a inventory_db"
+          }
+        },
+        {
+          "name": "Health - shipping-service",
+          "request": {
+            "method": "GET",
+            "url": "{{SHIPPING_URL}}/health",
+            "description": "Verifica estado del shipping-service y conexión a shipping_db"
+          }
+        },
+        {
+          "name": "Health - notification-service",
+          "request": {
+            "method": "GET",
+            "url": "{{NOTIFICATION_URL}}/health",
+            "description": "Verifica estado del notification-service y conexión a notification_db"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Test endpoint",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/orders/test"
+          }
+        },
+        {
+          "name": "Listar todas las órdenes",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/orders"
+          }
+        },
+        {
+          "name": "Reporte de órdenes con cliente (SP fn_get_orders_with_customer)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/report",
+              "query": [
+                { "key": "status", "value": "CREATED", "disabled": true, "description": "Filtrar por status (opcional)" }
+              ]
+            },
+            "description": "Retorna órdenes con datos del cliente via stored procedure fn_get_orders_with_customer"
+          }
+        },
+        {
+          "name": "Crear orden",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/orders",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"sku\": \"{{sku}}\",\n  \"quantity\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Actualizar status de orden",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{orderId}}/status?status=EN_REPARTO",
+              "query": [{ "key": "status", "value": "EN_REPARTO" }]
+            }
+          }
+        },
+        {
+          "name": "Confirmar orden (Saga: descuenta inventario + crea envío)",
+          "request": {
+            "method": "PUT",
+            "url": "{{BASE_URL}}/api/orders/{{orderId}}/confirm",
+            "description": "Orquesta la Saga: (1) descuenta inventario via fn_adjust_stock, (2) crea envío en shipping-service, (3) actualiza status a EN_PREPARACION"
+          }
+        },
+        {
+          "name": "Cancelar orden (SP fn_cancel_order)",
+          "request": {
+            "method": "PUT",
+            "url": "{{BASE_URL}}/api/orders/{{orderId}}/cancel",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Solicitud del cliente\"\n}"
+            },
+            "description": "Cancela la orden usando fn_cancel_order. Si estaba EN_PREPARACION, restaura stock."
+          }
+        },
+        {
+          "name": "Asignar transportista",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{orderId}}/assign?transporter=Repartidor%201",
+              "query": [{ "key": "transporter", "value": "Repartidor 1" }]
+            }
+          }
+        },
+        {
+          "name": "Eliminar orden",
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/api/orders/{{orderId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Listar clientes",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/customers"
+          }
+        },
+        {
+          "name": "Obtener cliente por ID",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/customers/{{customerId}}"
+          }
+        },
+        {
+          "name": "Crear cliente",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/customers",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Juan Perez\",\n  \"phone\": \"999888777\",\n  \"address\": \"Av. Lima 123\",\n  \"email\": \"juan@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Actualizar cliente",
+          "request": {
+            "method": "PUT",
+            "url": "{{BASE_URL}}/api/customers/{{customerId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Juan Perez Actualizado\",\n  \"phone\": \"999888777\",\n  \"address\": \"Av. Lima 456\",\n  \"email\": \"juan2@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar cliente",
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/api/customers/{{customerId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "Listar inventario",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/inventory"
+          }
+        },
+        {
+          "name": "Reporte de inventario (SP fn_get_inventory_report)",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/inventory/report",
+            "description": "Clasifica todos los productos por nivel: SIN_STOCK / CRITICO / BAJO / NORMAL"
+          }
+        },
+        {
+          "name": "Obtener producto por SKU",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/inventory/{{sku}}"
+          }
+        },
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/inventory",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"COCA-2L\",\n  \"stock\": 100\n}"
+            }
+          }
+        },
+        {
+          "name": "Actualizar stock",
+          "request": {
+            "method": "PUT",
+            "url": "{{BASE_URL}}/api/inventory/{{sku}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 200\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar producto",
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/api/inventory/{{sku}}"
+          }
+        },
+        {
+          "name": "Ajustar stock (SP fn_adjust_stock)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/{{sku}}/adjust?delta=10",
+              "query": [{ "key": "delta", "value": "10", "description": "Positivo = ingreso, Negativo = descuento" }]
+            },
+            "description": "Usa fn_adjust_stock. delta positivo = ingreso de stock, delta negativo = descuento (registra venta automáticamente)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales",
+      "item": [
+        {
+          "name": "Listar ventas",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/sales"
+          }
+        },
+        {
+          "name": "Registrar venta",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/sales",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"COCA-2L\",\n  \"quantity\": 3\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shipments",
+      "item": [
+        {
+          "name": "Listar envíos",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/shipments"
+          }
+        },
+        {
+          "name": "Obtener envío por orderId",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/shipments/{{orderId}}"
+          }
+        },
+        {
+          "name": "Crear envío",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/shipments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": {{orderId}},\n  \"sku\": \"{{sku}}\",\n  \"quantity\": 5\n}"
+            },
+            "description": "Al crear un envío, notifica automáticamente al notification-service."
+          }
+        },
+        {
+          "name": "Actualizar etapa de envío",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{BASE_URL}}/api/shipments/{{shipmentId}}/stage?stage=EN_REPARTO",
+              "query": [{ "key": "stage", "value": "EN_REPARTO", "description": "EN_PREPARACION | EN_REPARTO | ENTREGADO | CANCELADO" }]
+            }
+          }
+        },
+        {
+          "name": "Obtener QR de envío",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/shipments/{{shipmentId}}/qr",
+            "description": "Retorna datos de tracking en formato QR"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Crear notificación",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/notifications",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"evt-001-shipment\",\n  \"orderId\": {{orderId}},\n  \"stage\": \"EN_PREPARACION\",\n  \"message\": \"Tu pedido está siendo preparado\",\n  \"audience\": \"customer\"\n}"
+            },
+            "description": "Idempotente: eventId duplicado retorna 409."
+          }
+        },
+        {
+          "name": "Notificaciones por orderId",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/notifications/order/{{orderId}}"
+          }
+        },
+        {
+          "name": "Notificaciones por audiencia",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/notifications/audience/customer",
+            "description": "Filtrar notificaciones por audiencia (customer, admin, driver, etc.)"
+          }
+        }
+      ]
+    }
+  ]
+}

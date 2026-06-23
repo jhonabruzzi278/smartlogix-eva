@@ -1,7 +1,11 @@
-Repositorio principal del proyecto SmartLogix
-=============================================
+Repositorios del proyecto SmartLogix — Evaluacion Parcial N°3
+==============================================================
 
-Enlace: https://github.com/JONAHBRUZZI/smartlogix
+Repositorio principal (desarrollo):
+  https://github.com/JONAHBRUZZI/smartlogix
+
+Repositorio de evaluacion (Eva2):
+  https://github.com/jhonabruzzi278/smartlogix-eva
 
 Este repositorio contiene la plataforma completa de gestion logistica SmartLogix.
 Incluye el frontend React (SPA + PWA), los 4 microservicios backend (Node.js/Express),
@@ -65,8 +69,19 @@ Infraestructura:
 - VM DigitalOcean (hosting del backend en 104.248.60.29)
 
 
-Documentacion de entregables (rubrica):
-----------------------------------------
-- /ENTREGABLE/analisis-patrones-arquetipos.md
-- /ENTREGABLE/plan-branching.md
+Documentacion de entregables (rubrica Parcial N°3):
+----------------------------------------------------
+- /ENTREGABLE/Documentacion/01-arquitectura.html       (imprimir a PDF: Diagrama de arquitectura)
+- /ENTREGABLE/Documentacion/02-persistencia.html       (imprimir a PDF: Descripcion de persistencia + SPs)
+- /ENTREGABLE/Documentacion/03-informe-pruebas.html    (imprimir a PDF: Informe de pruebas y cobertura)
+- /ENTREGABLE/SmartLogix-Postman-Collection.json       (Coleccion Postman importable)
 - /ENTREGABLE/repositorios.txt (este archivo)
+
+Cobertura de pruebas unitarias (todas superan el umbral minimo del 60%):
+--------------------------------------------------------------------------
+- Frontend            : 53 tests  | Statements 80.12% | Branches 76.29%
+- orders-service      : 42 tests  | Statements 83.58% | Branches 96.77%
+- inventory-service   : 33 tests  | Statements 78.16% | Branches 97.43%
+- shipping-service    : 20 tests  | Statements 85.71% | Branches 86.66%
+- notification-service: 16 tests  | Statements 73.68% | Branches 85.71%
+- TOTAL               : 164 tests | Todas las metricas sobre 60%

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SmartLogix - Informe de Pruebas Unitarias</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; background: #fff; padding: 32px; }
+  h1 { font-size: 26px; color: #0f3460; border-bottom: 3px solid #e94560; padding-bottom: 10px; margin-bottom: 6px; }
+  h2 { font-size: 17px; color: #16213e; margin: 24px 0 10px; border-left: 4px solid #e94560; padding-left: 10px; }
+  h3 { font-size: 14px; color: #0f3460; margin: 14px 0 6px; }
+  p, li { font-size: 13px; line-height: 1.6; color: #333; }
+  ul { padding-left: 18px; margin-bottom: 10px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 28px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; margin-bottom: 14px; }
+  th { background: #0f3460; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  code { font-family: 'Consolas', 'Courier New', monospace; background: #f0f4f8; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  .pass { color: #1b5e20; font-weight: 700; }
+  .pass-bg { background: #e8f5e9 !important; }
+  .warn { color: #e65100; font-weight: 700; }
+  .total-row td { background: #0f3460 !important; color: white !important; font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .badge-pass { background: #d4edda; color: #155724; }
+  .badge-vitest { background: #fef3c7; color: #92400e; }
+  .badge-jest { background: #dbeafe; color: #1e40af; }
+  .cov-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .cov-bar { height: 14px; border-radius: 6px; display: inline-block; min-width: 4px; }
+  .cov-label { font-size: 11px; font-weight: 700; }
+  .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0; }
+  .summary-card { border: 1px solid #dde3ec; border-radius: 8px; padding: 12px; text-align: center; }
+  .summary-card .num { font-size: 28px; font-weight: 800; color: #0f3460; }
+  .summary-card .lbl { font-size: 11px; color: #666; margin-top: 2px; }
+  .component-section { border: 1px solid #dde3ec; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .component-header { background: #f0f4f8; padding: 10px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #dde3ec; }
+  .component-header h3 { margin: 0; font-size: 14px; color: #0f3460; }
+  .component-body { padding: 14px; }
+  .cov-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cov-metric-name { font-size: 12px; color: #555; width: 100px; flex-shrink: 0; }
+  .cov-pct { font-size: 12px; font-weight: 700; width: 46px; }
+  .bar-bg { flex: 1; height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; }
+  .green { background: #4caf50; }
+  .orange { background: #ff9800; }
+  .test-list { margin-top: 10px; }
+  .test-item { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 12px; }
+  .test-icon { color: #4caf50; font-size: 13px; margin-top: 1px; }
+  .info-box { background: #e8f4fd; border-left: 4px solid #0f3460; padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+  .info-box p { font-size: 12.5px; color: #0f3460; }
+  footer { margin-top: 36px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; text-align: center; }
+  @media print {
+    body { padding: 20px; }
+    @page { margin: 1.5cm; size: A4; }
+    .page-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<h1>SmartLogix — Informe de Pruebas Unitarias</h1>
+<p class="subtitle">Evaluación Parcial N°3 &nbsp;|&nbsp; Frameworks: Vitest (Frontend) + Jest (Backend) &nbsp;|&nbsp; Cobertura mínima requerida: 60%</p>
+
+<h2>1. Resumen Ejecutivo</h2>
+
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="num">164</div>
+    <div class="lbl">Tests totales</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:#1b5e20;">164</div>
+    <div class="lbl">Tests pasados</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:#e94560;">0</div>
+    <div class="lbl">Tests fallidos</div>
+  </div>
+  <div class="summary-card">
+    <div class="num">5</div>
+    <div class="lbl">Componentes cubiertos</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:#1b5e20;">5/5</div>
+    <div class="lbl">Sobre umbral 60%</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Componente</th>
+      <th>Framework</th>
+      <th>Tests</th>
+      <th>Statements</th>
+      <th>Branches</th>
+      <th>Functions</th>
+      <th>Lines</th>
+      <th>Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="pass-bg">
+      <td><strong>Frontend</strong></td>
+      <td><span class="badge badge-vitest">Vitest</span></td>
+      <td>53</td>
+      <td>80.12%</td>
+      <td>76.29%</td>
+      <td>77.27%</td>
+      <td>82.87%</td>
+      <td class="pass">&#10003; PASA</td>
+    </tr>
+    <tr class="pass-bg">
+      <td><strong>orders-service</strong></td>
+      <td><span class="badge badge-jest">Jest</span></td>
+      <td>42</td>
+      <td>83.58%</td>
+      <td>96.77%</td>
+      <td>82.35%</td>
+      <td>82.72%</td>
+      <td class="pass">&#10003; PASA</td>
+    </tr>
+    <tr class="pass-bg">
+      <td><strong>inventory-service</strong></td>
+      <td><span class="badge badge-jest">Jest</span></td>
+      <td>33</td>
+      <td>78.16%</td>
+      <td>97.43%</td>
+      <td>75.00%</td>
+      <td>78.37%</td>
+      <td class="pass">&#10003; PASA</td>
+    </tr>
+    <tr class="pass-bg">
+      <td><strong>shipping-service</strong></td>
+      <td><span class="badge badge-jest">Jest</span></td>
+      <td>20</td>
+      <td>85.71%</td>
+      <td>86.66%</td>
+      <td>75.00%</td>
+      <td>86.44%</td>
+      <td class="pass">&#10003; PASA</td>
+    </tr>
+    <tr class="pass-bg">
+      <td><strong>notification-service</strong></td>
+      <td><span class="badge badge-jest">Jest</span></td>
+      <td>16</td>
+      <td>73.68%</td>
+      <td>85.71%</td>
+      <td>60.00%</td>
+      <td>74.19%</td>
+      <td class="pass">&#10003; PASA</td>
+    </tr>
+    <tr class="total-row">
+      <td>TOTAL</td>
+      <td>—</td>
+      <td>164</td>
+      <td>~80.2%</td>
+      <td>~88.6%</td>
+      <td>~73.9%</td>
+      <td>~80.7%</td>
+      <td>&#10003; TODO OK</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="info-box">
+  <p><strong>Umbral de aprobación:</strong> 60% en todos los componentes en todas las métricas. Todos los 5 componentes superan el umbral. La métrica más baja es <em>notification-service / Functions = 60.00%</em>, que cumple exactamente el mínimo requerido.</p>
+</div>
+
+<h2>2. Detalle por Componente</h2>
+
+<!-- Frontend -->
+<div class="component-section">
+  <div class="component-header">
+    <span class="badge badge-vitest">Vitest</span>
+    <h3>Frontend — React 18 + TypeScript + Vite</h3>
+    <span style="font-size:12px;color:#666;margin-left:auto;">53 tests &nbsp;|&nbsp; src/test/</span>
+  </div>
+  <div class="component-body">
+    <div class="cov-row">
+      <div class="cov-metric-name">Statements</div>
+      <div class="cov-pct" style="color:#4caf50;">80.12%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:80.12%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Branches</div>
+      <div class="cov-pct" style="color:#4caf50;">76.29%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:76.29%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Functions</div>
+      <div class="cov-pct" style="color:#4caf50;">77.27%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:77.27%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Lines</div>
+      <div class="cov-pct" style="color:#4caf50;">82.87%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:82.87%"></div></div>
+    </div>
+    <div class="test-list">
+      <strong style="font-size:12px;">Archivos de test:</strong>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><code>src/test/api-adapters.test.ts</code> — Adaptadores de datos entre API y UI (formateo de fechas, estado de órdenes, métricas)</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><code>src/test/api-client.test.ts</code> — Cliente HTTP (fetch mock), manejo de errores, timeout, headers</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><code>src/test/use-api-query.test.tsx</code> — Hook personalizado <code>useApiQuery</code>: loading, error, data states, refetch</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- orders-service -->
+<div class="component-section">
+  <div class="component-header">
+    <span class="badge badge-jest">Jest</span>
+    <h3>orders-service — Node.js + Express + PostgreSQL</h3>
+    <span style="font-size:12px;color:#666;margin-left:auto;">42 tests &nbsp;|&nbsp; src/index.test.js</span>
+  </div>
+  <div class="component-body">
+    <div class="cov-row">
+      <div class="cov-metric-name">Statements</div>
+      <div class="cov-pct" style="color:#4caf50;">83.58%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:83.58%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Branches</div>
+      <div class="cov-pct" style="color:#4caf50;">96.77%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:96.77%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Functions</div>
+      <div class="cov-pct" style="color:#4caf50;">82.35%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:82.35%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Lines</div>
+      <div class="cov-pct" style="color:#4caf50;">82.72%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:82.72%"></div></div>
+    </div>
+    <div class="test-list">
+      <strong style="font-size:12px;">Grupos de tests (describe blocks):</strong>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /health</strong> (2 tests) — BD disponible → UP; BD falla → DEGRADED 503</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>POST /api/orders</strong> (5 tests) — Crear orden válida; rechazar sin customerId, sin sku, quantity=0, quantity negativa</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/orders</strong> (2 tests) — Lista completa; array vacío</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>PUT /api/orders/:id/status</strong> (4 tests) — Actualizar status; normalizar minúsculas; status inválido 400; 404</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>PUT /api/orders/:id/confirm (Saga)</strong> (4 tests) — Confirmar saga completa (2 fetch calls); 404; warnings si inventario falla; warnings si shipping falla</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>PUT /api/orders/:id/cancel (fn_cancel_order SP)</strong> (3 tests) — Cancelar CREATED sin restaurar stock; cancelar EN_PREPARACION + restaurar stock; 404</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/orders/report (fn_get_orders_with_customer SP)</strong> (3 tests) — Reporte con JOIN cliente; filtro por status; array vacío</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>PUT /api/orders/:id/assign</strong> (3 tests) — Asignar transportista; sin parámetro 400; 404</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>DELETE /api/orders/:id</strong> (2 tests) — Eliminar existente; 404</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>Customers CRUD</strong> (14 tests) — GET lista, GET por ID, POST crear, PUT actualizar, DELETE; validaciones de nombre obligatorio</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- inventory-service -->
+<div class="component-section">
+  <div class="component-header">
+    <span class="badge badge-jest">Jest</span>
+    <h3>inventory-service — Node.js + Express + PostgreSQL</h3>
+    <span style="font-size:12px;color:#666;margin-left:auto;">33 tests &nbsp;|&nbsp; src/index.test.js</span>
+  </div>
+  <div class="component-body">
+    <div class="cov-row">
+      <div class="cov-metric-name">Statements</div>
+      <div class="cov-pct" style="color:#4caf50;">78.16%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:78.16%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Branches</div>
+      <div class="cov-pct" style="color:#4caf50;">97.43%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:97.43%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Functions</div>
+      <div class="cov-pct" style="color:#4caf50;">75.00%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:75%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Lines</div>
+      <div class="cov-pct" style="color:#4caf50;">78.37%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:78.37%"></div></div>
+    </div>
+    <div class="test-list">
+      <strong style="font-size:12px;">Grupos de tests (describe blocks):</strong>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /health</strong> (2 tests)</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>Inventory CRUD</strong> (13 tests) — GET lista, GET por SKU, POST crear (con validaciones), PUT actualizar, DELETE</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>POST /api/inventory/:sku/adjust (fn_adjust_stock SP)</strong> (6 tests) — delta positivo, delta negativo + registra venta, delta=0 rechazado, delta no numérico, stock insuficiente 400, SKU no encontrado 404</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/inventory/report (fn_get_inventory_report SP)</strong> (2 tests) — Clasificación SIN_STOCK/CRITICO/NORMAL; array vacío</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>Sales CRUD</strong> (7 tests) — GET lista, POST registrar venta (validaciones, stock insuficiente, SKU no encontrado)</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- shipping-service -->
+<div class="component-section">
+  <div class="component-header">
+    <span class="badge badge-jest">Jest</span>
+    <h3>shipping-service — Node.js + Express + PostgreSQL</h3>
+    <span style="font-size:12px;color:#666;margin-left:auto;">20 tests &nbsp;|&nbsp; src/index.test.js</span>
+  </div>
+  <div class="component-body">
+    <div class="cov-row">
+      <div class="cov-metric-name">Statements</div>
+      <div class="cov-pct" style="color:#4caf50;">85.71%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:85.71%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Branches</div>
+      <div class="cov-pct" style="color:#4caf50;">86.66%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:86.66%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Functions</div>
+      <div class="cov-pct" style="color:#4caf50;">75.00%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:75%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Lines</div>
+      <div class="cov-pct" style="color:#4caf50;">86.44%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:86.44%"></div></div>
+    </div>
+    <div class="test-list">
+      <strong style="font-size:12px;">Grupos de tests (describe blocks):</strong>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /health</strong> (2 tests) — UP; DEGRADED</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/shipments</strong> (2 tests) — Lista completa; array vacío</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/shipments/:orderId</strong> (2 tests) — Por order ID; 404</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>POST /api/shipments</strong> (5 tests) — Crear con tracking UUID; sin orderId 400; sin sku 400; notificación al notification-service; fetch falla sin bloquear</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>PUT /api/shipments/:id/stage</strong> (5 tests) — Actualizar etapa; stage inválido 400; 404; stage EN_REPARTO; normalizar a uppercase</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/shipments/:id/qr</strong> (2 tests) — Retorna QR JSON; 404</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- notification-service -->
+<div class="component-section">
+  <div class="component-header">
+    <span class="badge badge-jest">Jest</span>
+    <h3>notification-service — Node.js + Express + PostgreSQL</h3>
+    <span style="font-size:12px;color:#666;margin-left:auto;">16 tests &nbsp;|&nbsp; src/index.test.js</span>
+  </div>
+  <div class="component-body">
+    <div class="cov-row">
+      <div class="cov-metric-name">Statements</div>
+      <div class="cov-pct" style="color:#4caf50;">73.68%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:73.68%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Branches</div>
+      <div class="cov-pct" style="color:#4caf50;">85.71%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:85.71%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Functions</div>
+      <div class="cov-pct" style="color:#ff9800;">60.00%</div>
+      <div class="bar-bg"><div class="bar-fill orange" style="width:60%"></div></div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-metric-name">Lines</div>
+      <div class="cov-pct" style="color:#4caf50;">74.19%</div>
+      <div class="bar-bg"><div class="bar-fill green" style="width:74.19%"></div></div>
+    </div>
+    <div class="test-list">
+      <strong style="font-size:12px;">Grupos de tests (describe blocks):</strong>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /health</strong> (2 tests) — UP; DEGRADED</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>POST /api/notifications</strong> (5 tests) — Crear notificación válida; duplicado (23505) → 409; sin eventId 400; sin orderId 400; sin stage 400</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/notifications/order/:orderId</strong> (4 tests) — Por order ID; 404; lista múltiple; order sin notificaciones</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /api/notifications/audience/:audience</strong> (3 tests) — Por audiencia; vacío; audiencia no existente</span></div>
+      <div class="test-item"><span class="test-icon">&#10003;</span><span><strong>GET /health (DEGRADED)</strong> (2 tests) — Estado degradado por BD inaccesible</span></div>
+    </div>
+  </div>
+</div>
+
+<h2 class="page-break">3. Configuración de Testing</h2>
+
+<h3>Frontend — Vitest + @testing-library/react</h3>
+<table>
+  <thead><tr><th>Propiedad</th><th>Valor</th></tr></thead>
+  <tbody>
+    <tr><td>Framework</td><td>Vitest 2.x</td></tr>
+    <tr><td>Environment</td><td>jsdom</td></tr>
+    <tr><td>Coverage provider</td><td>@vitest/coverage-v8</td></tr>
+    <tr><td>Archivo config</td><td>Frontend/vite.config.ts (sección test)</td></tr>
+    <tr><td>Setup files</td><td>src/test/setup.ts (MSW, @testing-library/jest-dom)</td></tr>
+    <tr><td>Comando</td><td><code>npm test -- --coverage</code></td></tr>
+    <tr><td>Umbral configurado</td><td>60% statements, branches, functions, lines</td></tr>
+  </tbody>
+</table>
+
+<h3>Backend (microservicios) — Jest + Supertest</h3>
+<table>
+  <thead><tr><th>Propiedad</th><th>Valor</th></tr></thead>
+  <tbody>
+    <tr><td>Framework</td><td>Jest 29.x</td></tr>
+    <tr><td>Test environment</td><td>node</td></tr>
+    <tr><td>HTTP testing</td><td>supertest (peticiones HTTP sin levantar servidor)</td></tr>
+    <tr><td>Mocking BD</td><td>Factory mock: <code>jest.mock('../shared/db', () => ({ createPool: jest.fn() }))</code></td></tr>
+    <tr><td>Module resolution</td><td><code>moduleNameMapper</code> + <code>modulePaths</code> para shared modules</td></tr>
+    <tr><td>Coverage provider</td><td>jest --coverage (built-in)</td></tr>
+    <tr><td>Comando</td><td><code>npm test -- --coverage</code> (dentro de cada microservicio)</td></tr>
+    <tr><td>Archivos incluidos</td><td><code>src/**/*.js</code> (excluyendo <code>*.test.js</code>)</td></tr>
+    <tr><td>Output</td><td>text, html, lcov</td></tr>
+  </tbody>
+</table>
+
+<h2>4. Técnicas de Testing Aplicadas</h2>
+<ul>
+  <li><strong>Mocking de base de datos:</strong> <code>jest.fn()</code> con <code>mockResolvedValueOnce</code> simula respuestas de PostgreSQL sin base de datos real.</li>
+  <li><strong>Mocking de fetch (inter-service):</strong> <code>global.fetch = jest.fn()</code> intercepta llamadas HTTP entre microservicios (Saga pattern).</li>
+  <li><strong>Factory mocks:</strong> evitan que Jest cargue módulos con dependencias externas (<code>pg</code>, <code>express</code>) durante la inicialización del mock.</li>
+  <li><strong>Patrón AAA (Arrange-Act-Assert):</strong> todos los tests siguen el patrón de preparar mocks, ejecutar el endpoint vía <code>supertest</code>, y verificar status code + body.</li>
+  <li><strong>Test de stored procedures:</strong> tests especializados que verifican el comportamiento del endpoint cuando el SP retorna diferentes valores (<code>success: true/false</code>, distintos <code>error_msg</code>).</li>
+  <li><strong>Idempotencia de tests:</strong> <code>beforeEach(() => jest.clearAllMocks())</code> limpia el estado entre cada test para evitar interferencias.</li>
+  <li><strong>Require.main guard:</strong> <code>if (require.main === module)</code> previene el inicio del servidor cuando Jest importa el módulo, asegurando tests sin side effects.</li>
+</ul>
+
+<footer>SmartLogix — Informe de Pruebas Unitarias &nbsp;|&nbsp; Evaluación Parcial N°3 &nbsp;|&nbsp; 2026 &nbsp;|&nbsp; 164/164 tests passing &#10003;</footer>
+</body>
+</html>

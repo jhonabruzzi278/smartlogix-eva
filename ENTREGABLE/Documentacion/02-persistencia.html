@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SmartLogix - Persistencia de Datos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; background: #fff; padding: 32px; }
+  h1 { font-size: 26px; color: #0f3460; border-bottom: 3px solid #e94560; padding-bottom: 10px; margin-bottom: 6px; }
+  h2 { font-size: 17px; color: #16213e; margin: 24px 0 10px; border-left: 4px solid #e94560; padding-left: 10px; }
+  h3 { font-size: 14px; color: #0f3460; margin: 14px 0 6px; }
+  p, li { font-size: 13px; line-height: 1.6; color: #333; }
+  ul { padding-left: 18px; margin-bottom: 10px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 28px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; margin-bottom: 16px; }
+  th { background: #0f3460; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  code, pre { font-family: 'Consolas', 'Courier New', monospace; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 14px 18px; border-radius: 8px; font-size: 12px; overflow-x: auto; margin: 10px 0 16px; line-height: 1.5; }
+  .kw { color: #cba6f7; } /* keywords */
+  .fn { color: #89b4fa; } /* function names */
+  .tp { color: #f9e2af; } /* types */
+  .st { color: #a6e3a1; } /* strings */
+  .cm { color: #6c7086; } /* comments */
+  .num { color: #fab387; } /* numbers */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-right: 4px; }
+  .badge-sp { background: #d4edda; color: #155724; }
+  .badge-jpa { background: #cce5ff; color: #004085; }
+  .badge-pg { background: #fff3cd; color: #856404; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+  .db-card { border: 2px solid #0f3460; border-radius: 8px; padding: 14px; }
+  .db-card h3 { color: #0f3460; margin-bottom: 8px; font-size: 13px; }
+  .db-title { background: #0f3460; color: white; padding: 6px 12px; border-radius: 6px 6px 0 0; font-size: 13px; font-weight: 700; margin: -14px -14px 12px; }
+  .info-box { background: #e8f4fd; border-left: 4px solid #0f3460; padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+  .info-box p { font-size: 12.5px; color: #0f3460; }
+  footer { margin-top: 36px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; text-align: center; }
+  @media print {
+    body { padding: 20px; }
+    @page { margin: 1.5cm; size: A4; }
+    .page-break { page-break-before: always; }
+    pre { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>SmartLogix — Persistencia de Datos</h1>
+<p class="subtitle">Evaluación Parcial N°3 &nbsp;|&nbsp; Estrategia: PostgreSQL + Stored Procedures (plpgsql)</p>
+
+<h2>1. Estrategia de Persistencia</h2>
+<p>SmartLogix utiliza <strong>PostgreSQL 15</strong> como motor de base de datos relacional. La capa de persistencia combina dos enfoques:</p>
+<ul>
+  <li><strong>Acceso directo vía SQL parametrizado</strong>: queries con <code>$1, $2, ...</code> usando el driver <code>pg</code> de Node.js (protección contra SQL injection).</li>
+  <li><strong>Stored Procedures (funciones plpgsql)</strong>: lógica de negocio compleja delegada a la base de datos para operaciones atómicas y reportes con JOIN.</li>
+</ul>
+
+<div class="info-box">
+  <p><strong>Patrón Database-per-Service:</strong> cada microservicio tiene su propia base de datos independiente. No existe acceso cruzado entre bases de datos. El pool de conexiones se crea en el módulo compartido <code>Backend/shared/db.js</code> usando <code>pg.Pool</code>.</p>
+</div>
+
+<h2>2. Esquemas de Base de Datos</h2>
+
+<div class="grid2">
+  <div class="db-card">
+    <div class="db-title">orders_db (orders-service :8081)</div>
+    <table>
+      <thead><tr><th>Tabla</th><th>Columnas principales</th></tr></thead>
+      <tbody>
+        <tr><td><strong>orders</strong></td><td>id, customer_id, sku, quantity, status, created_at, assigned_to, cancel_reason</td></tr>
+        <tr><td><strong>customers</strong></td><td>id, name, phone, address, email, created_at</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:#555;">Status values: CREATED, EN_PREPARACION, EN_REPARTO, ENTREGADO, CANCELADO</p>
+  </div>
+  <div class="db-card">
+    <div class="db-title">inventory_db (inventory-service :8082)</div>
+    <table>
+      <thead><tr><th>Tabla</th><th>Columnas principales</th></tr></thead>
+      <tbody>
+        <tr><td><strong>inventory</strong></td><td>id, sku (UNIQUE), stock</td></tr>
+        <tr><td><strong>sales</strong></td><td>id, sku, quantity, sale_date</td></tr>
+        <tr><td><strong>processed_events</strong></td><td>event_type, event_key (PK compuesto), processed_at</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="db-card">
+    <div class="db-title">shipping_db (shipping-service :8084)</div>
+    <table>
+      <thead><tr><th>Tabla</th><th>Columnas principales</th></tr></thead>
+      <tbody>
+        <tr><td><strong>shipments</strong></td><td>id, order_id, sku, quantity, stage, tracking_number, created_at, updated_at</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:#555;">Stages: EN_PREPARACION, EN_REPARTO, ENTREGADO, CANCELADO</p>
+  </div>
+  <div class="db-card">
+    <div class="db-title">notification_db (notification-service :8085)</div>
+    <table>
+      <thead><tr><th>Tabla</th><th>Columnas principales</th></tr></thead>
+      <tbody>
+        <tr><td><strong>notifications</strong></td><td>id, event_id (UNIQUE), order_id, stage, message, audience, created_at</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:#555;">Idempotencia: event_id UNIQUE previene duplicados (constraint 23505)</p>
+  </div>
+</div>
+
+<h2>3. Stored Procedures (Funciones plpgsql)</h2>
+
+<p>SmartLogix implementa 4 stored procedures en PostgreSQL, creadas automáticamente al iniciar cada microservicio mediante la función <code>ensureProcedures()</code>. Usan la extensión <span class="badge badge-sp">plpgsql</span> de PostgreSQL.</p>
+
+<h3>3.1 fn_adjust_stock — inventory_db</h3>
+<p><strong>Propósito:</strong> Ajustar el stock de un SKU de forma atómica. Retorna un resultado estructurado indicando éxito o tipo de error (SKU no encontrado vs. stock insuficiente).</p>
+
+<pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="fn">fn_adjust_stock</span>(p_sku <span class="tp">TEXT</span>, p_delta <span class="tp">INT</span>)
+<span class="kw">RETURNS TABLE</span>(
+    sku_out <span class="tp">TEXT</span>, new_stock <span class="tp">INT</span>, delta <span class="tp">INT</span>,
+    success <span class="tp">BOOLEAN</span>, error_msg <span class="tp">TEXT</span>
+)
+<span class="kw">AS</span> <span class="st">$fn$</span>
+<span class="kw">DECLARE</span>
+    v_new_stock <span class="tp">INT</span>;
+    v_exists   <span class="tp">BOOLEAN</span>;
+<span class="kw">BEGIN</span>
+    <span class="cm">-- Verificar existencia del SKU</span>
+    <span class="kw">SELECT</span> <span class="fn">EXISTS</span>(<span class="kw">SELECT</span> <span class="num">1</span> <span class="kw">FROM</span> inventory <span class="kw">WHERE</span> sku = p_sku) <span class="kw">INTO</span> v_exists;
+
+    <span class="kw">IF NOT</span> v_exists <span class="kw">THEN</span>
+        <span class="kw">RETURN QUERY SELECT</span> p_sku, <span class="kw">NULL</span>::<span class="tp">INT</span>, p_delta,
+                            <span class="st">FALSE</span>, <span class="st">'SKU no encontrado'</span>::<span class="tp">TEXT</span>;
+        <span class="kw">RETURN</span>;
+    <span class="kw">END IF</span>;
+
+    <span class="cm">-- Actualizar solo si stock + delta >= 0 (evita stock negativo)</span>
+    <span class="kw">UPDATE</span> inventory
+    <span class="kw">SET</span> stock = stock + p_delta
+    <span class="kw">WHERE</span> sku = p_sku <span class="kw">AND</span> stock + p_delta >= <span class="num">0</span>
+    <span class="kw">RETURNING</span> stock <span class="kw">INTO</span> v_new_stock;
+
+    <span class="kw">IF</span> v_new_stock <span class="kw">IS NOT NULL THEN</span>
+        <span class="kw">RETURN QUERY SELECT</span> p_sku, v_new_stock, p_delta,
+                            <span class="st">TRUE</span>, <span class="kw">NULL</span>::<span class="tp">TEXT</span>;
+    <span class="kw">ELSE</span>
+        <span class="kw">RETURN QUERY SELECT</span> p_sku, <span class="kw">NULL</span>::<span class="tp">INT</span>, p_delta,
+                            <span class="st">FALSE</span>, <span class="st">'Stock insuficiente'</span>::<span class="tp">TEXT</span>;
+    <span class="kw">END IF</span>;
+<span class="kw">END</span>;
+<span class="st">$fn$</span> <span class="kw">LANGUAGE</span> plpgsql;</pre>
+
+<p><strong>Invocación desde Node.js:</strong></p>
+<pre><span class="kw">const</span> r = <span class="kw">await</span> pool.query(<span class="st">'SELECT * FROM fn_adjust_stock($1,$2)'</span>, [sku, delta]);
+<span class="kw">const</span> result = r.rows[<span class="num">0</span>];
+<span class="kw">if</span> (!result.success) {
+    <span class="kw">const</span> status = result.error_msg === <span class="st">'SKU no encontrado'</span> ? <span class="num">404</span> : <span class="num">400</span>;
+    <span class="kw">return</span> res.status(status).json({ error: result.error_msg });
+}</pre>
+
+<h3>3.2 fn_get_inventory_report — inventory_db</h3>
+<p><strong>Propósito:</strong> Clasificar todos los productos por nivel de stock en tiempo real.</p>
+
+<pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="fn">fn_get_inventory_report</span>()
+<span class="kw">RETURNS TABLE</span>(sku <span class="tp">VARCHAR</span>, stock <span class="tp">INT</span>, stock_level <span class="tp">TEXT</span>)
+<span class="kw">AS</span> <span class="st">$fn$</span>
+<span class="kw">BEGIN</span>
+    <span class="kw">RETURN QUERY</span>
+        <span class="kw">SELECT</span> i.sku, i.stock,
+               <span class="kw">CASE</span>
+                   <span class="kw">WHEN</span> i.stock = <span class="num">0</span>    <span class="kw">THEN</span> <span class="st">'SIN_STOCK'</span>
+                   <span class="kw">WHEN</span> i.stock < <span class="num">10</span>   <span class="kw">THEN</span> <span class="st">'CRITICO'</span>
+                   <span class="kw">WHEN</span> i.stock < <span class="num">30</span>   <span class="kw">THEN</span> <span class="st">'BAJO'</span>
+                   <span class="kw">ELSE</span>                      <span class="st">'NORMAL'</span>
+               <span class="kw">END</span>::<span class="tp">TEXT</span>
+        <span class="kw">FROM</span> inventory i
+        <span class="kw">ORDER BY</span> i.stock <span class="kw">ASC</span>;
+<span class="kw">END</span>;
+<span class="st">$fn$</span> <span class="kw">LANGUAGE</span> plpgsql;</pre>
+
+<h3>3.3 fn_get_orders_with_customer — orders_db</h3>
+<p><strong>Propósito:</strong> Obtener órdenes con datos del cliente (JOIN entre <code>orders</code> y <code>customers</code>), con filtro opcional por status.</p>
+
+<pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="fn">fn_get_orders_with_customer</span>(p_status <span class="tp">TEXT</span> <span class="kw">DEFAULT NULL</span>)
+<span class="kw">RETURNS TABLE</span>(
+    order_id <span class="tp">INT</span>, customer_name <span class="tp">VARCHAR</span>, customer_email <span class="tp">VARCHAR</span>,
+    sku <span class="tp">VARCHAR</span>, quantity <span class="tp">INT</span>, status <span class="tp">VARCHAR</span>,
+    created_at <span class="tp">TIMESTAMP</span>, assigned_to <span class="tp">VARCHAR</span>
+)
+<span class="kw">AS</span> <span class="st">$fn$</span>
+<span class="kw">BEGIN</span>
+    <span class="kw">RETURN QUERY</span>
+        <span class="kw">SELECT</span>
+            o.id,
+            <span class="fn">COALESCE</span>(c.name, <span class="st">'Sin cliente'</span>),
+            <span class="fn">COALESCE</span>(c.email, <span class="st">''</span>),
+            o.sku, o.quantity, o.status,
+            o.created_at, o.assigned_to
+        <span class="kw">FROM</span> orders o
+        <span class="kw">LEFT JOIN</span> customers c <span class="kw">ON</span> c.id = o.customer_id
+        <span class="kw">WHERE</span> p_status <span class="kw">IS NULL OR</span> o.status = p_status
+        <span class="kw">ORDER BY</span> o.created_at <span class="kw">DESC</span>;
+<span class="kw">END</span>;
+<span class="st">$fn$</span> <span class="kw">LANGUAGE</span> plpgsql;</pre>
+
+<h3>3.4 fn_cancel_order — orders_db</h3>
+<p><strong>Propósito:</strong> Cancelar una orden de forma atómica: UPDATE + SELECT en una sola transacción usando SETOF. Retorna la orden actualizada.</p>
+
+<pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="fn">fn_cancel_order</span>(
+    p_order_id <span class="tp">INT</span>, p_reason <span class="tp">TEXT</span> <span class="kw">DEFAULT</span> <span class="st">''</span>
+)
+<span class="kw">RETURNS SETOF</span> orders
+<span class="kw">AS</span> <span class="st">$fn$</span>
+<span class="kw">BEGIN</span>
+    <span class="cm">-- Actualizar a CANCELADO (solo si no está ya cancelada)</span>
+    <span class="kw">UPDATE</span> orders
+    <span class="kw">SET</span> status = <span class="st">'CANCELADO'</span>, cancel_reason = p_reason
+    <span class="kw">WHERE</span> id = p_order_id <span class="kw">AND</span> status &lt;&gt; <span class="st">'CANCELADO'</span>;
+
+    <span class="cm">-- Retornar la fila actualizada</span>
+    <span class="kw">RETURN QUERY SELECT</span> * <span class="kw">FROM</span> orders <span class="kw">WHERE</span> id = p_order_id;
+<span class="kw">END</span>;
+<span class="st">$fn$</span> <span class="kw">LANGUAGE</span> plpgsql;</pre>
+
+<h2>4. Resumen de Stored Procedures</h2>
+
+<table>
+  <thead>
+    <tr><th>Función</th><th>Base de datos</th><th>Tipo retorno</th><th>Invocada en endpoint</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>fn_adjust_stock(sku, delta)</code></td>
+      <td>inventory_db</td>
+      <td>TABLE (sku, stock, delta, success, error_msg)</td>
+      <td><code>POST /api/inventory/:sku/adjust</code></td>
+    </tr>
+    <tr>
+      <td><code>fn_get_inventory_report()</code></td>
+      <td>inventory_db</td>
+      <td>TABLE (sku, stock, stock_level)</td>
+      <td><code>GET /api/inventory/report</code></td>
+    </tr>
+    <tr>
+      <td><code>fn_get_orders_with_customer(status?)</code></td>
+      <td>orders_db</td>
+      <td>TABLE (order_id, customer_name, ...)</td>
+      <td><code>GET /api/orders/report</code></td>
+    </tr>
+    <tr>
+      <td><code>fn_cancel_order(order_id, reason?)</code></td>
+      <td>orders_db</td>
+      <td>SETOF orders</td>
+      <td><code>PUT /api/orders/:id/cancel</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5. Pool de Conexiones (Backend/shared/db.js)</h2>
+<p>Todos los microservicios usan el módulo compartido para crear el pool PostgreSQL:</p>
+<pre><span class="cm">// Backend/shared/db.js</span>
+<span class="kw">const</span> { Pool } = <span class="fn">require</span>(<span class="st">'pg'</span>);
+
+<span class="kw">function</span> <span class="fn">createPool</span>(dbName) {
+  <span class="kw">return new</span> <span class="fn">Pool</span>({
+    host:     process.env.DB_HOST || <span class="st">'localhost'</span>,
+    port:     process.env.DB_PORT || <span class="num">5432</span>,
+    database: process.env.DB_NAME || dbName,
+    user:     process.env.DB_USER || <span class="st">'postgres'</span>,
+    password: process.env.DB_PASSWORD || <span class="st">'postgres'</span>,
+    max:      <span class="num">10</span>,
+    idleTimeoutMillis: <span class="num">30000</span>,
+  });
+}
+
+module.exports = { createPool };</pre>
+
+<footer>SmartLogix — Persistencia de Datos &nbsp;|&nbsp; Evaluación Parcial N°3 &nbsp;|&nbsp; 2026</footer>
+</body>
+</html>
