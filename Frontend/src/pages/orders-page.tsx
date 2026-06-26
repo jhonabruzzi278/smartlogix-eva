@@ -11,6 +11,7 @@ import { adaptCustomer, adaptInventory, adaptOrder } from "@/lib/api-adapters";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import { exportOrdersCSV } from "@/lib/export-csv";
 import { addHistoryEntry } from "@/lib/order-history";
+import { useCustomerScope } from "@/hooks/use-customer-scope";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { ApiCreateOrderRequest, ApiCreateOrderResponse, ApiCustomer, ApiInventory, ApiOrder } from "@/types/api";
@@ -47,6 +48,8 @@ export function OrdersPage() {
   const canReview = can("orders.review");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const customerScope = useCustomerScope();
+
   const { data: customers, loading: cLoading } = useApiQuery<ApiCustomer[], Customer[]>({
     path: "/api/customers", transform: (r) => r.map(adaptCustomer)
   });
@@ -60,7 +63,8 @@ export function OrdersPage() {
     transform: (r) => {
       const customerMap = new Map<string, string>();
       (customers ?? []).forEach((c) => customerMap.set(c.id, c.name));
-      return r.map((o) => adaptOrder(o, customerMap.get(String(o.customerId))));
+      const list = Array.isArray(r) ? r : (r as { data: ApiOrder[] }).data ?? [];
+      return list.map((o) => adaptOrder(o, customerMap.get(String(o.customerId))));
     }
   });
 
@@ -118,27 +122,34 @@ export function OrdersPage() {
   }
 
   const filtered = useMemo(() => {
-    let list = operationalOrders;
+    let list = customerScope.isCustomer
+      ? operationalOrders.filter((o) => o.customerId === customerScope.linkedCustomerId)
+      : operationalOrders;
     if (tab !== "all") list = list.filter((o) => o.stage === tab);
     if (query) {
       const q = query.toLowerCase();
       list = list.filter((o) => `${o.id} ${o.customer} ${o.sku} ${o.assignedTo ?? ""}`.toLowerCase().includes(q));
     }
     return list;
-  }, [operationalOrders, tab, query]);
+  }, [operationalOrders, tab, query, customerScope.isCustomer, customerScope.linkedCustomerId]);
 
-  const counts = useMemo(() => ({
-    total: operationalOrders.length,
-    pending: validationQueue.length,
-    preparing: operationalOrders.filter((o) => o.stage === "en_preparación").length,
-    inTransit: operationalOrders.filter((o) => o.stage === "en_reparto").length,
-  }), [operationalOrders, validationQueue.length]);
+  const counts = useMemo(() => {
+    const base = customerScope.isCustomer
+      ? operationalOrders.filter((o) => o.customerId === customerScope.linkedCustomerId)
+      : operationalOrders;
+    return {
+      total: base.length,
+      pending: base.filter((o) => o.stage === "created").length,
+      preparing: base.filter((o) => o.stage === "en_preparacion").length,
+      inTransit: base.filter((o) => o.stage === "en_reparto").length,
+    };
+  }, [operationalOrders, customerScope.isCustomer, customerScope.linkedCustomerId]);
 
-  const tabs = ["all", "created", "en_preparación", "en_reparto", "entregado", "cancelado"] as const;
+  const tabs = ["all", "created", "en_preparacion", "en_reparto", "entregado", "cancelado"] as const;
   const tabLabels: Record<string, string> = {
     all: "Todos",
     created: "Pendientes",
-    en_preparación: "Preparación",
+    en_preparacion: "Preparación",
     en_reparto: "Reparto",
     entregado: "Entregados",
     cancelado: "Cancelados",
@@ -195,14 +206,14 @@ export function OrdersPage() {
 
   const badgeColor = (stage: string) =>
     stage === "created" ? "bg-[#4B98CF]/10 text-[#4B98CF]" :
-    stage === "en_preparación" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
+    stage === "en_preparacion" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
     stage === "en_reparto" ? "bg-purple-50 text-purple-600" :
     stage === "entregado" ? "bg-green-50 text-green-600" :
     stage === "cancelado" ? "bg-red-50 text-red-500" : "bg-muted text-muted-foreground";
 
   const stageLabel = (stage: string) =>
     stage === "created" ? "Pendiente" :
-    stage === "en_preparación" ? "Preparación" :
+    stage === "en_preparacion" ? "Preparación" :
     stage === "en_reparto" ? "En reparto" :
     stage === "entregado" ? "Entregado" :
     stage === "cancelado" ? "Cancelado" : stage;
@@ -212,13 +223,21 @@ export function OrdersPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[1.2px] text-muted-foreground">Pedidos</p>
-          <h1 className="text-xl font-bold text-foreground">Gestión de ordenes</h1>
+          <h1 className="text-xl font-bold text-foreground">
+            {customerScope.isCustomer && customerScope.linkedCustomer
+              ? `Mis pedidos - ${customerScope.linkedCustomer.name}`
+              : "Gestion de ordenes"}
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="rounded bg-muted px-2 py-0.5">{counts.total} total</span>
-          <span className="rounded bg-[#4B98CF]/10 px-2 py-0.5 text-[#4B98CF] font-bold">{counts.pending} pendientes</span>
-          <span className="rounded bg-[#E3AA75]/10 px-2 py-0.5 text-[#E3AA75] font-bold">{counts.preparing} preparación</span>
-          {canCreate && (
+          {!customerScope.isCustomer && (
+            <>
+              <span className="rounded bg-[#4B98CF]/10 px-2 py-0.5 text-[#4B98CF] font-bold">{counts.pending} pendientes</span>
+              <span className="rounded bg-[#E3AA75]/10 px-2 py-0.5 text-[#E3AA75] font-bold">{counts.preparing} preparacion</span>
+            </>
+          )}
+          {canCreate && !customerScope.isCustomer && (
             <>
               <button onClick={() => setShowForm(!showForm)} className="btn-touch-primary min-h-[40px] gap-1">
                 <Plus className="h-4 w-4" /> Nuevo
@@ -376,7 +395,7 @@ export function OrdersPage() {
                 <th className="px-4 py-3 hidden md:table-cell">Transportista</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3 hidden md:table-cell">Creado</th>
-                <th className="px-4 py-3 text-right">{canReview ? "Acción" : ""}</th>
+                {!customerScope.isCustomer && <th className="px-4 py-3 text-right">{canReview ? "Acci&oacute;n" : ""}</th>}
               </tr>
             </thead>
           <tbody>
@@ -417,6 +436,7 @@ export function OrdersPage() {
                   <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
                     {new Date(order.createdAt).toLocaleDateString("es-CL")}
                   </td>
+                  {!customerScope.isCustomer && (
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                    {canReview && order.stage === "created" && (
                      <div className="flex items-center justify-end gap-1 sm:gap-1.5">
@@ -424,7 +444,7 @@ export function OrdersPage() {
                        <button onClick={() => { setCancelModal(order); setCancelReason(""); }} title="Cancelar pedido" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
                      </div>
                    )}
-                    {canReview && order.stage === "en_preparación" && (
+                    {canReview && order.stage === "en_preparacion" && (
                       <div className="flex items-center justify-end gap-1 sm:gap-1.5">
                         <button onClick={() => { setCancelModal(order); setCancelReason(""); }} title="Cancelar pedido" className="inline-flex items-center justify-center rounded-lg border border-border min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] text-red-500 hover:bg-red-50 active:scale-[0.95] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4 sm:h-5 sm:w-5" /></button>
                       </div>
@@ -435,11 +455,12 @@ export function OrdersPage() {
                       </div>
                     )}
                   </td>
+                  )}
                 </tr>
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">Sin pedidos que coincidan</td></tr>
+              <tr><td colSpan={customerScope.isCustomer ? 7 : 8} className="px-4 py-12 text-center text-xs text-muted-foreground">Sin pedidos que coincidan</td></tr>
             )}
           </tbody>
         </table>
@@ -459,7 +480,7 @@ export function OrdersPage() {
             <p className="text-sm text-[#6B7280]">
               Ingresa el motivo de cancelacion para <strong>{cancelModal.customer}</strong> ({cancelModal.sku} x{cancelModal.quantity})
             </p>
-            {cancelModal.stage === "en_preparación" && (
+            {cancelModal.stage === "en_preparacion" && (
               <p className="text-xs text-[#E3AA75]">El stock se restaurará automáticamente</p>
             )}
             <textarea

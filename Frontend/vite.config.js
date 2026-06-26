@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
-var edgeTarget = (_a = process.env.SMARTLOGIX_EDGE_TARGET) !== null && _a !== void 0 ? _a : "http://localhost:80";
+var edgeTarget = (_a = process.env.SMARTLOGIX_EDGE_TARGET) !== null && _a !== void 0 ? _a : "http://localhost:8080";
 var localstackTarget = (_b = process.env.LOCALSTACK_TARGET) !== null && _b !== void 0 ? _b : "http://localhost:4567";
 function stripBrowserOrigin(proxy) {
     proxy.on("proxyReq", function (proxyReq) {

@@ -5,6 +5,7 @@ import { useApiQuery } from "@/hooks/use-api-query";
 import { usePosCart } from "@/hooks/use-pos-cart";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { adaptInventory } from "@/lib/api-adapters";
+import { ApiErrorBanner } from "@/components/common/api-error-banner";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { ApiInventory } from "@/types/api";
 import type { PaymentMethod, Product, ProductCategory, Sale } from "@/types/domain";
@@ -31,7 +32,7 @@ export function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [successSale, setSuccessSale] = useState<Sale | null>(null);
 
-  const { data: inventory, loading, refresh } = useApiQuery<ApiInventory[], Product[]>({
+  const { data: inventory, loading, error, refresh } = useApiQuery<ApiInventory[], Product[]>({
     path: "/api/inventory",
     transform: (r) => r.map(adaptInventory),
   });
@@ -241,6 +242,7 @@ export function PosPage() {
 
   return (
     <div className="space-y-4">
+      {error && <ApiErrorBanner error={error} onRetry={refresh} />}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

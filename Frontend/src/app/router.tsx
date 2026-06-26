@@ -18,6 +18,7 @@ import { ReportsPage } from "@/pages/reports-page";
 import { ShipmentsPage } from "@/pages/shipments-page";
 import { ShipperDeliveryPage } from "@/pages/shipper-delivery-page";
 import { ShipmentDetailPage } from "@/pages/shipment-detail-page";
+import { TrackingPage } from "@/pages/tracking-page";
 import { UsersPage } from "@/pages/users-page";
 
 export const router = createBrowserRouter([
@@ -28,6 +29,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />
+  },
+  {
+    path: "/tracking/:code?",
+    element: <TrackingPage />
   },
   {
     element: <RequireAuth />,

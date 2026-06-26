@@ -56,78 +56,231 @@ export function calculateHealthFromStock(stock: number): HealthState {
   return "healthy";
 }
 
-export function adaptOrder(apiOrder: ApiOrder, customerName?: string): Order {
+type SnakeOrder = Record<string, unknown> & {
+  id: number;
+  customer_id?: number;
+  customerId?: number;
+  sku: string;
+  quantity: number;
+  status: string;
+  created_at?: string | null;
+  createdAt?: string | null;
+  assigned_to?: string | null;
+  assignedTo?: string | null;
+  cancel_reason?: string | null;
+  cancelReason?: string | null;
+  client_code?: string | null;
+  clientCode?: string | null;
+};
+
+function readOrderField(order: SnakeOrder): {
+  id: number;
+  customerId: number;
+  sku: string;
+  quantity: number;
+  status: string;
+  createdAt: string | null;
+  assignedTo: string | null;
+  cancelReason: string | null;
+  clientCode: string | null;
+} {
   return {
-    id: String(apiOrder.id),
-    customer: customerName ?? `Cliente #${apiOrder.customerId}`,
-    customerId: String(apiOrder.customerId),
-    source: "Sincronizacion BD",
-    stage: normalizeOrderStage(apiOrder.status),
-    sku: String(apiOrder.sku),
-    quantity: apiOrder.quantity,
-    createdAt: apiOrder.createdAt ?? new Date().toISOString(),
-    eta: null,
-    items: [
-      {
-        sku: String(apiOrder.sku),
-        name: String(apiOrder.sku),
-        quantity: apiOrder.quantity
-      }
-    ],
-    timeline: [],
-    assignedTo: apiOrder.assignedTo ?? undefined,
-    cancelReason: apiOrder.cancelReason ?? null
+    id: order.id,
+    customerId: (order.customerId ?? order.customer_id ?? 0) as number,
+    sku: order.sku,
+    quantity: order.quantity,
+    status: order.status,
+    createdAt: (order.createdAt ?? order.created_at ?? null) as string | null,
+    assignedTo: (order.assignedTo ?? order.assigned_to ?? null) as string | null,
+    cancelReason: (order.cancelReason ?? order.cancel_reason ?? null) as string | null,
+    clientCode: (order.clientCode ?? order.client_code ?? null) as string | null,
   };
 }
 
-export function adaptInventory(apiInventory: ApiInventory): Product {
+export function adaptOrder(apiOrder: ApiOrder, customerName?: string): Order {
+  const f = readOrderField(apiOrder as unknown as SnakeOrder);
   return {
-    id: String(apiInventory.id),
-    sku: apiInventory.sku,
-    name: apiInventory.name,
-    stock: apiInventory.stock,
-    price: apiInventory.price,
-    cost: apiInventory.cost,
-    category: apiInventory.category as Product["category"],
-    status: calculateHealthFromStock(apiInventory.stock),
+    id: String(f.id),
+    customer: customerName ?? `Cliente #${f.customerId}`,
+    customerId: String(f.customerId),
+    source: "Sincronizacion BD",
+    stage: normalizeOrderStage(f.status),
+    sku: String(f.sku),
+    quantity: f.quantity,
+    createdAt: f.createdAt ?? new Date().toISOString(),
+    eta: null,
+    items: [
+      {
+        sku: String(f.sku),
+        name: String(f.sku),
+        quantity: f.quantity
+      }
+    ],
+    timeline: [],
+    assignedTo: f.assignedTo ?? undefined,
+    cancelReason: f.cancelReason ?? null,
+    clientCode: f.clientCode ?? null,
+  };
+}
+
+type SnakeInventory = Record<string, unknown> & {
+  id: number;
+  sku: string;
+  name?: string | null;
+  stock: number;
+  price?: number | null;
+  cost?: number | null;
+  category?: string | null;
+};
+
+const DEFAULT_PRODUCT_NAMES: Record<string, string> = {
+  "LAPTOP-HP-15": "Laptop HP 15\"",
+  "MONITOR-DELL-24": "Monitor Dell 24\"",
+  "TECLADO-LOGI": "Teclado Logitech",
+  "MOUSE-LOGI": "Mouse Logitech",
+  "COCA-COLA-2L": "Coca-Cola 2L",
+  "SPRITE-2L": "Sprite 2L",
+  "DORITOS-180G": "Doritos 180g",
+  "M&M-200G": "M&M 200g",
+  "ACEITE-CRISTAL-1L": "Aceite Cristal 1L",
+  "ARROZ-1KG": "Arroz 1Kg",
+  "FIDEOS-400G": "Fideos 400g",
+  "AZUCAR-1KG": "Azucar 1Kg",
+};
+
+const DEFAULT_CATEGORIES: Record<string, Product["category"]> = {
+  "LAPTOP-HP-15": "otros",
+  "MONITOR-DELL-24": "otros",
+  "TECLADO-LOGI": "otros",
+  "MOUSE-LOGI": "otros",
+  "COCA-COLA-2L": "bebidas",
+  "SPRITE-2L": "bebidas",
+  "DORITOS-180G": "galletas",
+  "M&M-200G": "dulces",
+  "ACEITE-CRISTAL-1L": "otros",
+  "ARROZ-1KG": "otros",
+  "FIDEOS-400G": "otros",
+  "AZUCAR-1KG": "otros",
+};
+
+const DEFAULT_PRICES: Record<string, number> = {
+  "LAPTOP-HP-15": 450000,
+  "MONITOR-DELL-24": 180000,
+  "TECLADO-LOGI": 25000,
+  "MOUSE-LOGI": 15000,
+  "COCA-COLA-2L": 2200,
+  "SPRITE-2L": 2000,
+  "DORITOS-180G": 1200,
+  "M&M-200G": 1800,
+  "ACEITE-CRISTAL-1L": 3500,
+  "ARROZ-1KG": 1800,
+  "FIDEOS-400G": 1100,
+  "AZUCAR-1KG": 1500,
+};
+
+export function adaptInventory(apiInventory: ApiInventory): Product {
+  const inv = apiInventory as unknown as SnakeInventory;
+  const name = (inv.name as string) || DEFAULT_PRODUCT_NAMES[inv.sku] || inv.sku;
+  const price = (inv.price as number) ?? DEFAULT_PRICES[inv.sku] ?? 0;
+  const cost = (inv.cost as number) ?? Math.round(price * 0.65);
+  const cat = ((inv.category as string) || DEFAULT_CATEGORIES[inv.sku] || "otros") as Product["category"];
+  return {
+    id: String(inv.id),
+    sku: inv.sku,
+    name,
+    stock: inv.stock,
+    price,
+    cost,
+    category: cat,
+    status: calculateHealthFromStock(inv.stock),
     updatedAt: new Date().toISOString()
   };
 }
 
-export function adaptShipment(apiShipment: ApiShipment): Shipment {
-  const stage = normalizeShipmentStage(apiShipment.status);
+type SnakeShipment = Record<string, unknown> & {
+  id: number;
+  order_id?: number;
+  orderId?: number;
+  customer_id?: number;
+  customerId?: number;
+  sku: string;
+  quantity: number;
+  status: string;
+  tracking_number?: string | null;
+  trackingNumber?: string | null;
+  created_at?: string | null;
+  createdAt?: string | null;
+  shipped_at?: string | null;
+  shippedAt?: string | null;
+  proof_of_delivery_image?: string | null;
+  proofOfDeliveryImage?: string | null;
+  recipient_rut?: string | null;
+  recipientRut?: string | null;
+  customer_code?: string | null;
+  customerCode?: string | null;
+};
+
+function readShipmentField(s: SnakeShipment) {
   return {
-    id: String(apiShipment.id),
-    orderId: String(apiShipment.orderId),
-    customerId: String(apiShipment.customerId),
-    sku: String(apiShipment.sku),
-    quantity: apiShipment.quantity,
-    carrier: apiShipment.trackingNumber ? "Transportista asignado" : "Pendiente de asignacion",
-    tracking: apiShipment.trackingNumber ?? "Pendiente",
+    id: s.id,
+    orderId: (s.orderId ?? s.order_id ?? 0) as number,
+    customerId: (s.customerId ?? s.customer_id ?? 0) as number,
+    sku: s.sku,
+    quantity: s.quantity,
+    status: s.status,
+    trackingNumber: (s.trackingNumber ?? s.tracking_number ?? null) as string | null,
+    createdAt: (s.createdAt ?? s.created_at ?? null) as string | null,
+    shippedAt: (s.shippedAt ?? s.shipped_at ?? null) as string | null,
+    proofOfDeliveryImage: (s.proofOfDeliveryImage ?? s.proof_of_delivery_image ?? null) as string | null,
+    recipientRut: (s.recipientRut ?? s.recipient_rut ?? null) as string | null,
+    customerCode: (s.customerCode ?? s.customer_code ?? null) as string | null,
+  };
+}
+
+export function adaptShipment(apiShipment: ApiShipment): Shipment {
+  const f = readShipmentField(apiShipment as unknown as SnakeShipment);
+  const stage = normalizeShipmentStage(f.status);
+  return {
+    id: String(f.id),
+    orderId: String(f.orderId),
+    customerId: String(f.customerId),
+    sku: String(f.sku),
+    quantity: f.quantity,
+    carrier: f.trackingNumber ? "Transportista asignado" : "Pendiente de asignacion",
+    tracking: f.trackingNumber ?? "Pendiente",
     stage,
-    eta: apiShipment.status === 'EN_REPARTO'
+    eta: f.status === 'EN_REPARTO'
       ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      : apiShipment.shippedAt ?? apiShipment.createdAt ?? null,
-    createdAt: apiShipment.createdAt ?? new Date().toISOString(),
-    shippedAt: apiShipment.shippedAt ?? null,
+      : f.shippedAt ?? f.createdAt ?? null,
+    createdAt: f.createdAt ?? new Date().toISOString(),
+    shippedAt: f.shippedAt ?? null,
     exception: stage === "cancelado" ? "Envio cancelado" : undefined,
-    proofOfDeliveryImage: apiShipment.proofOfDeliveryImage ?? null,
-    recipientRut: apiShipment.recipientRut ?? null,
-    customerCode: apiShipment.customerCode ?? null
+    proofOfDeliveryImage: f.proofOfDeliveryImage ?? null,
+    recipientRut: f.recipientRut ?? null,
+    customerCode: f.customerCode ?? null
   };
 }
 
 export function adaptNotifications(records: ApiNotificationRecord[]): TimelineEvent[] {
   return (records ?? [])
     .slice()
-    .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime())
-    .map((record) => ({
-      id: String(record.id),
-      title: record.stage,
-      detail: `${record.message} | ${record.sourceService}`,
-      timestamp: record.occurredAt,
-      state: normalizeHealth(record.status)
-    }));
+    .sort((left, right) => {
+      const la = (left as unknown as Record<string, unknown>).occurredAt ?? (left as unknown as Record<string, unknown>).occurred_at ?? left.occurredAt;
+      const ra = (right as unknown as Record<string, unknown>).occurredAt ?? (right as unknown as Record<string, unknown>).occurred_at ?? right.occurredAt;
+      return new Date(la as string).getTime() - new Date(ra as string).getTime();
+    })
+    .map((record) => {
+      const r = record as unknown as Record<string, unknown>;
+      const occurredAt = (r.occurredAt ?? r.occurred_at ?? record.occurredAt) as string;
+      const sourceService = (r.sourceService ?? r.source_service ?? record.sourceService ?? "external") as string;
+      return {
+        id: String(r.id ?? record.id),
+        title: (r.stage ?? record.stage) as string,
+        detail: `${r.message ?? record.message} | ${sourceService}`,
+        timestamp: occurredAt,
+        state: normalizeHealth((r.status ?? record.status) as string)
+      };
+    });
 }
 
 export function normalizeIntegrationHealth(rawStatus: string): HealthState {
@@ -135,12 +288,14 @@ export function normalizeIntegrationHealth(rawStatus: string): HealthState {
 }
 
 export function adaptCustomer(apiCustomer: ApiCustomer): Customer {
+  const c = apiCustomer as unknown as Record<string, unknown>;
   return {
-    id: String(apiCustomer.id),
-    name: apiCustomer.name,
-    phone: apiCustomer.phone ?? undefined,
-    address: apiCustomer.address ?? undefined,
-    email: apiCustomer.email ?? undefined,
-    createdAt: apiCustomer.createdAt ?? (apiCustomer as Record<string, unknown>).created_at as string ?? new Date().toISOString()
+    id: String(c.id as number),
+    name: c.name as string,
+    phone: (c.phone as string) ?? undefined,
+    address: (c.address as string) ?? undefined,
+    email: (c.email as string) ?? undefined,
+    createdAt: ((c.createdAt ?? c.created_at ?? new Date().toISOString()) as string),
+    rut: (c.rut as string) ?? null,
   };
 }

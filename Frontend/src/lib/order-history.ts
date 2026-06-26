@@ -1,4 +1,4 @@
-const HISTORY_KEY = "smartlogix-order-history";
+const HISTORY_KEY = "smartlogix-order-history:v2";
 
 export interface HistoryEntry {
   id: string;

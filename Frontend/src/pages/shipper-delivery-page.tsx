@@ -1,5 +1,5 @@
-﻿import { useCallback, useMemo, useRef, useState } from "react";
-import { Camera, Package, QrCode, Search, Truck, User, X } from "lucide-react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, CheckCircle, Package, QrCode, Search, Truck, User, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/app/auth";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -23,6 +23,8 @@ export function ShipperDeliveryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [showQrModal, setShowQrModal] = useState<Shipment | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [prevShipmentIds, setPrevShipmentIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { can, role } = usePermissions();
   const canUpdate = can("shipments.update");
@@ -77,6 +79,25 @@ export function ShipperDeliveryPage() {
     active: operationalShipments.filter((s) => s.stage !== "entregado" && s.stage !== "cancelado").length,
     delivered: operationalShipments.filter((s) => s.stage === "entregado").length,
   }), [operationalShipments]);
+
+  useEffect(() => {
+    if (!operationalShipments.length) return;
+    const currentIds = new Set(operationalShipments.map((s) => s.id));
+    const newShipments = operationalShipments.filter((s) => !prevShipmentIds.has(s.id));
+    if (prevShipmentIds.size > 0 && newShipments.length > 0) {
+      const pendingPickup = newShipments.filter((s) => s.stage === "en_preparacion");
+      const inTransit = newShipments.filter((s) => s.stage === "en_reparto");
+      if (pendingPickup.length > 0) {
+        setToastMessage(`Nuevo pedido para retirar: ${pendingPickup.length} envio(s)`);
+      } else if (inTransit.length > 0) {
+        setToastMessage(`Envios en reparto actualizados: ${inTransit.length}`);
+      } else {
+        setToastMessage(`${newShipments.length} envio(s) actualizado(s)`);
+      }
+      setTimeout(() => setToastMessage(null), 5000);
+    }
+    setPrevShipmentIds(currentIds);
+  }, [operationalShipments.length]);
 
   async function handlePickup(shipment: Shipment) {
     setStageShipment(shipment);
@@ -156,7 +177,9 @@ export function ShipperDeliveryPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Envíos</p>
-          <h1 className="text-xl font-bold text-[#112b4a]">Gestión de envíos</h1>
+          <h1 className="text-xl font-bold text-[#112b4a]">
+            {isShipper ? `Hola, ${session?.name?.split(" ")[0] ?? "Transportista"}` : "Gestion de envios"}
+          </h1>
         </div>
         <div className="flex items-center gap-3 text-xs text-[#6B7280]">
           <span>{counts.total} total</span>
@@ -164,6 +187,16 @@ export function ShipperDeliveryPage() {
           <span className="text-[#4EB4A5] font-bold">{counts.delivered} entregados</span>
         </div>
       </div>
+
+      {toastMessage && (
+        <div className="flex items-center gap-2 rounded-lg bg-[#4B98CF] text-white px-4 py-3 text-sm animate-pulse">
+          <Truck className="h-4 w-4" />
+          <span className="flex-1 font-medium">{toastMessage}</span>
+          <button onClick={() => setToastMessage(null)} className="text-white/70 hover:text-white">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -212,13 +245,13 @@ export function ShipperDeliveryPage() {
                 <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
                   <span className={cn(
                     "rounded px-2 py-0.5 text-[10px] font-bold",
-                    shipment.stage === "en_preparación" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
+                    shipment.stage === "en_preparacion" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
                     shipment.stage === "en_reparto" ? "bg-purple-50 text-purple-600" :
                     shipment.stage === "entregado" ? "bg-green-50 text-green-600" :
                     shipment.stage === "cancelado" ? "bg-red-50 text-red-500" :
                     "bg-[#4B98CF]/10 text-[#4B98CF]"
                   )}>
-                    {shipment.stage === "en_preparación" ? "Preparación" :
+                    {shipment.stage === "en_preparacion" ? "Preparación" :
                      shipment.stage === "en_reparto" ? "En reparto" :
                      shipment.stage === "entregado" ? "Entregado" :
                      shipment.stage === "cancelado" ? "Cancelado" : shipment.stage}
@@ -226,7 +259,7 @@ export function ShipperDeliveryPage() {
 
                   {canUpdate && shipment.stage !== "entregado" && shipment.stage !== "cancelado" && (
                     <div className="flex items-center gap-1">
-                      {shipment.stage === "en_preparación" && (
+                      {shipment.stage === "en_preparacion" && (
                         <>
                           <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleQrScan(shipment); }} className="rounded border border-[#DCE0E2] px-2.5 py-1 text-[10px] font-semibold text-[#4B98CF] hover:bg-[#4B98CF]/5 flex items-center gap-1">
                             <QrCode className="h-3 w-3" /> QR

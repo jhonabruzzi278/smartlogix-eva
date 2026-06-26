@@ -16,6 +16,7 @@ export interface ApiOrder {
   createdAt: string | null;
   assignedTo: string | null;
   cancelReason: string | null;
+  clientCode?: string | null;
 }
 
 export interface ApiCustomer {
@@ -25,6 +26,7 @@ export interface ApiCustomer {
   address: string | null;
   email: string | null;
   createdAt: string | null;
+  rut?: string | null;
 }
 
 export interface ApiCreateOrderRequest {
@@ -38,6 +40,7 @@ export interface ApiCreateOrderResponse {
   status: string;
   message: string;
   createdAt?: string | null;
+  clientCode?: string | null;
 }
 
 export interface ApiInventory {

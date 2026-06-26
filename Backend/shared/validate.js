@@ -21,8 +21,9 @@ function validateInventoryBody(body) {
 
 function validateSaleBody(body) {
   const errors = [];
-  if (!body || !body.sku) errors.push('sku es requerido');
-  if (!body || !body.quantity) errors.push('quantity es requerido');
+  if (!body) { errors.push('body es requerido'); return errors; }
+  if (!body.items && !body.sku) errors.push('items o sku es requerido');
+  if (body.sku && (!body.quantity || body.quantity < 1)) errors.push('quantity debe ser >= 1');
   return errors;
 }
 

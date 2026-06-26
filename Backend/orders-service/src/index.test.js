@@ -18,6 +18,7 @@ const mockOrder = {
   status: 'CREATED', created_at: new Date().toISOString(),
   assigned_to: null, cancel_reason: null
 };
+
 const mockCustomer = {
   id: 1, name: 'Juan Perez', phone: '999888777',
   address: 'Av. Lima 123', email: 'juan@example.com',
@@ -28,78 +29,102 @@ describe('orders-service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockQuery.mockResolvedValue({ rows: [] });
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: jest.fn().mockResolvedValue('')
-    });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, text: jest.fn().mockResolvedValue('') });
   });
 
+  // ─── HEALTH ────────────────────────────────────────────────────────────────
+
   describe('GET /health', () => {
-    it('retorna UP cuando BD disponible', async () => {
+    it('retorna 200 UP con db=connected cuando BD disponible', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [1] });
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('UP');
+      expect(res.body).toMatchObject({ status: 'UP', db: 'connected' });
     });
 
-    it('retorna DEGRADED cuando BD falla', async () => {
-      mockQuery.mockRejectedValueOnce(new Error('DB Error'));
+    it('retorna 503 DEGRADED cuando BD falla', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
       const res = await request(app).get('/health');
       expect(res.status).toBe(503);
+      expect(res.body.status).toBe('DEGRADED');
     });
   });
 
+  // ─── TEST ENDPOINT ──────────────────────────────────────────────────────────
+
   describe('GET /api/orders/test', () => {
-    it('retorna texto de bienvenida', async () => {
+    it('retorna texto que incluye orders-service UP', async () => {
       const res = await request(app).get('/api/orders/test');
       expect(res.status).toBe(200);
       expect(res.text).toMatch(/orders-service UP/i);
     });
   });
 
+  // ─── POST /api/orders ───────────────────────────────────────────────────────
+
   describe('POST /api/orders', () => {
-    it('crea orden válida', async () => {
+    it('crea orden válida → 201 con orderId, status, sku, quantity, customerId', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockOrder] });
       const res = await request(app).post('/api/orders')
         .send({ customerId: 10, sku: 'COCA-2L', quantity: 5 });
       expect(res.status).toBe(201);
       expect(res.body.orderId).toBe(1);
       expect(res.body.status).toBe('CREATED');
+      expect(res.body.sku).toBe('COCA-2L');
+      expect(res.body.quantity).toBe(5);
+      expect(typeof res.body.orderId).toBe('number');
     });
 
-    it('rechaza sin customerId', async () => {
+    it('rechaza sin customerId → 400 con error sobre customerId', async () => {
       const res = await request(app).post('/api/orders').send({ sku: 'COCA-2L', quantity: 5 });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/customerId/i);
     });
 
-    it('rechaza sin sku', async () => {
+    it('rechaza sin sku → 400 con error sobre sku', async () => {
       const res = await request(app).post('/api/orders').send({ customerId: 10, quantity: 5 });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/sku/i);
     });
 
-    it('rechaza quantity = 0', async () => {
+    it('rechaza quantity = 0 → 400 con error sobre quantity', async () => {
       const res = await request(app).post('/api/orders')
         .send({ customerId: 10, sku: 'COCA-2L', quantity: 0 });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/quantity/i);
     });
 
-    it('rechaza quantity negativa', async () => {
+    it('rechaza quantity negativa → 400', async () => {
       const res = await request(app).post('/api/orders')
         .send({ customerId: 10, sku: 'COCA-2L', quantity: -3 });
       expect(res.status).toBe(400);
     });
+
+    it('rechaza body vacío → 400', async () => {
+      const res = await request(app).post('/api/orders').send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('retorna 500 si BD falla al crear orden', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).post('/api/orders')
+        .send({ customerId: 10, sku: 'COCA-2L', quantity: 5 });
+      expect(res.status).toBe(500);
+    });
   });
 
+  // ─── GET /api/orders ────────────────────────────────────────────────────────
+
   describe('GET /api/orders', () => {
-    it('retorna lista de órdenes', async () => {
+    it('retorna lista de órdenes con campos correctos', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockOrder] });
       const res = await request(app).get('/api/orders');
       expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].sku).toBe('COCA-2L');
+      expect(res.body[0].status).toBe('CREATED');
+      expect(typeof res.body[0].id).toBe('number');
     });
 
     it('retorna array vacío si no hay órdenes', async () => {
@@ -108,23 +133,87 @@ describe('orders-service', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
     });
+
+    it('retorna 500 si BD falla al listar', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).get('/api/orders');
+      expect(res.status).toBe(500);
+    });
   });
 
+  // ─── GET /api/orders/report ─────────────────────────────────────────────────
+
+  describe('GET /api/orders/report (SP fn_get_orders_with_customer)', () => {
+    const mockReport = [{
+      order_id: 1, customer_name: 'Juan Perez', customer_email: 'juan@test.com',
+      customer_phone: '999888777', sku: 'COCA-2L', quantity: 5, status: 'CREATED',
+      created_at: new Date().toISOString(), assigned_to: null
+    }];
+
+    it('retorna reporte con datos de cliente (JOIN via SP)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: mockReport });
+      const res = await request(app).get('/api/orders/report');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].customer_name).toBe('Juan Perez');
+      expect(res.body[0].order_id).toBe(1);
+      expect(res.body[0].status).toBe('CREATED');
+    });
+
+    it('filtra por status=CANCELADO', async () => {
+      const cancelado = [{ ...mockReport[0], status: 'CANCELADO' }];
+      mockQuery.mockResolvedValueOnce({ rows: cancelado });
+      const res = await request(app).get('/api/orders/report?status=CANCELADO');
+      expect(res.status).toBe(200);
+      expect(res.body[0].status).toBe('CANCELADO');
+    });
+
+    it('filtra por status=EN_PREPARACION', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/orders/report?status=EN_PREPARACION');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('retorna array vacío si no hay órdenes', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/orders/report');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('retorna 500 si BD falla al generar reporte', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('SP error'));
+      const res = await request(app).get('/api/orders/report');
+      expect(res.status).toBe(500);
+    });
+  });
+
+  // ─── PUT /api/orders/:id/status ─────────────────────────────────────────────
+
   describe('PUT /api/orders/:id/status', () => {
-    it('actualiza status a EN_REPARTO', async () => {
+    it('actualiza status a EN_REPARTO → body tiene el status actualizado', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'EN_REPARTO' }] });
       const res = await request(app).put('/api/orders/1/status?status=EN_REPARTO');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('EN_REPARTO');
     });
 
-    it('acepta status en minúsculas (normaliza a uppercase)', async () => {
+    it('acepta status en minúsculas (normaliza a CREATED uppercase)', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'CREATED' }] });
       const res = await request(app).put('/api/orders/1/status?status=created');
       expect(res.status).toBe(200);
+      expect(res.body.status).toBe('CREATED');
     });
 
-    it('rechaza status inválido', async () => {
+    it('acepta todos los statuses válidos: EN_PREPARACION', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'EN_PREPARACION' }] });
+      const res = await request(app).put('/api/orders/1/status?status=EN_PREPARACION');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('EN_PREPARACION');
+    });
+
+    it('rechaza status inválido → 400 con mensaje "Status invalido"', async () => {
       const res = await request(app).put('/api/orders/1/status?status=INVALIDO');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/Status invalido/i);
@@ -134,11 +223,20 @@ describe('orders-service', () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).put('/api/orders/999/status?status=EN_REPARTO');
       expect(res.status).toBe(404);
+      expect(res.body.error).toBeDefined();
+    });
+
+    it('retorna 500 si BD falla al actualizar status', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).put('/api/orders/1/status?status=EN_REPARTO');
+      expect(res.status).toBe(500);
     });
   });
 
-  describe('PUT /api/orders/:id/confirm (saga)', () => {
-    it('confirma orden: descuenta inventario, crea envío, actualiza status', async () => {
+  // ─── PUT /api/orders/:id/confirm (Saga) ────────────────────────────────────
+
+  describe('PUT /api/orders/:id/confirm (saga orquestada)', () => {
+    it('confirma orden: descuenta inventario, crea envío, status=EN_PREPARACION', async () => {
       const confirmed = { ...mockOrder, status: 'EN_PREPARACION' };
       mockQuery
         .mockResolvedValueOnce({ rows: [mockOrder] })
@@ -147,17 +245,31 @@ describe('orders-service', () => {
       const res = await request(app).put('/api/orders/1/confirm');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('EN_PREPARACION');
-      expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(res.body.warnings).toBeUndefined();
+      // Saga llama exactamente 2 servicios: inventory + shipping
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('retorna 404 si la orden no existe', async () => {
+    it('llama a inventory-service con adjust del sku y cantidad correcta', async () => {
+      const confirmed = { ...mockOrder, status: 'EN_PREPARACION' };
+      mockQuery
+        .mockResolvedValueOnce({ rows: [mockOrder] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [confirmed] });
+      await request(app).put('/api/orders/1/confirm');
+      const inventoryCall = global.fetch.mock.calls[0][0];
+      expect(inventoryCall).toMatch(/inventory/i);
+      expect(inventoryCall).toMatch(/COCA-2L/);
+    });
+
+    it('retorna 404 si la orden no existe antes de confirmar', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).put('/api/orders/999/confirm');
       expect(res.status).toBe(404);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('incluye warnings si inventario falla pero completa la saga', async () => {
+    it('incluye warning si inventory-service falla (saga continúa)', async () => {
       const confirmed = { ...mockOrder, status: 'EN_PREPARACION' };
       mockQuery
         .mockResolvedValueOnce({ rows: [mockOrder] })
@@ -168,11 +280,12 @@ describe('orders-service', () => {
         .mockResolvedValueOnce({ ok: true });
       const res = await request(app).put('/api/orders/1/confirm');
       expect(res.status).toBe(200);
-      expect(res.body.warnings).toBeDefined();
+      expect(res.body.status).toBe('EN_PREPARACION');
+      expect(Array.isArray(res.body.warnings)).toBe(true);
       expect(res.body.warnings[0]).toMatch(/Inventario/i);
     });
 
-    it('incluye warnings si shipping falla pero completa la saga', async () => {
+    it('incluye warning si shipping-service falla (saga continúa)', async () => {
       const confirmed = { ...mockOrder, status: 'EN_PREPARACION' };
       mockQuery
         .mockResolvedValueOnce({ rows: [mockOrder] })
@@ -183,13 +296,24 @@ describe('orders-service', () => {
         .mockRejectedValueOnce(new Error('Shipping unavailable'));
       const res = await request(app).put('/api/orders/1/confirm');
       expect(res.status).toBe(200);
-      expect(res.body.warnings).toBeDefined();
+      expect(Array.isArray(res.body.warnings)).toBe(true);
       expect(res.body.warnings[0]).toMatch(/Envío/i);
+    });
+
+    it('retorna 500 si BD falla al actualizar status tras saga', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [mockOrder] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('DB crash on update'));
+      const res = await request(app).put('/api/orders/1/confirm');
+      expect(res.status).toBe(500);
     });
   });
 
-  describe('PUT /api/orders/:id/cancel (usa fn_cancel_order)', () => {
-    it('cancela orden en status CREATED sin restaurar stock', async () => {
+  // ─── PUT /api/orders/:id/cancel ─────────────────────────────────────────────
+
+  describe('PUT /api/orders/:id/cancel (SP fn_cancel_order)', () => {
+    it('cancela orden CREATED sin restaurar stock (no llama a inventory)', async () => {
       const cancelado = { ...mockOrder, status: 'CANCELADO', cancel_reason: 'Solicitud del cliente' };
       mockQuery
         .mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'CREATED' }] })
@@ -200,14 +324,26 @@ describe('orders-service', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('cancela orden EN_PREPARACION, restaura stock y usa el SP', async () => {
+    it('cancela orden EN_PREPARACION restaurando stock (llama a inventory)', async () => {
       const cancelado = { ...mockOrder, status: 'CANCELADO' };
       mockQuery
         .mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'EN_PREPARACION' }] })
         .mockResolvedValueOnce({ rows: [cancelado] });
-      const res = await request(app).put('/api/orders/1/cancel').send({ reason: '' });
+      const res = await request(app).put('/api/orders/1/cancel').send({ reason: 'Cambio de parecer' });
       expect(res.status).toBe(200);
+      expect(res.body.status).toBe('CANCELADO');
       expect(global.fetch).toHaveBeenCalledTimes(1);
+      const inventoryCall = global.fetch.mock.calls[0][0];
+      expect(inventoryCall).toMatch(/inventory/i);
+    });
+
+    it('cancela sin reason (campo opcional)', async () => {
+      const cancelado = { ...mockOrder, status: 'CANCELADO' };
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ ...mockOrder, status: 'CREATED' }] })
+        .mockResolvedValueOnce({ rows: [cancelado] });
+      const res = await request(app).put('/api/orders/1/cancel').send({});
+      expect(res.status).toBe(200);
     });
 
     it('retorna 404 si orden no existe', async () => {
@@ -215,40 +351,20 @@ describe('orders-service', () => {
       const res = await request(app).put('/api/orders/999/cancel').send({ reason: '' });
       expect(res.status).toBe(404);
     });
-  });
 
-  describe('GET /api/orders/report (usa fn_get_orders_with_customer)', () => {
-    it('retorna reporte de órdenes con datos de cliente', async () => {
-      const mockReport = [{
-        order_id: 1, customer_name: 'Juan Perez', customer_email: 'juan@test.com',
-        sku: 'COCA-2L', quantity: 5, status: 'CREATED',
-        created_at: new Date().toISOString(), assigned_to: null
-      }];
-      mockQuery.mockResolvedValueOnce({ rows: mockReport });
-      const res = await request(app).get('/api/orders/report');
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].customer_name).toBe('Juan Perez');
-      expect(res.body[0].order_id).toBe(1);
-    });
-
-    it('filtra órdenes por status', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
-      const res = await request(app).get('/api/orders/report?status=CANCELADO');
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual([]);
-    });
-
-    it('retorna array vacío si no hay órdenes', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
-      const res = await request(app).get('/api/orders/report');
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual([]);
+    it('retorna 500 si BD falla al cancelar', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [mockOrder] })
+        .mockRejectedValueOnce(new Error('SP error'));
+      const res = await request(app).put('/api/orders/1/cancel').send({ reason: 'test' });
+      expect(res.status).toBe(500);
     });
   });
+
+  // ─── PUT /api/orders/:id/assign ─────────────────────────────────────────────
 
   describe('PUT /api/orders/:id/assign', () => {
-    it('asigna transportista a la orden', async () => {
+    it('asigna transportista → body tiene assigned_to correcto', async () => {
       const asignada = { ...mockOrder, assigned_to: 'Repartidor 1' };
       mockQuery.mockResolvedValueOnce({ rows: [asignada] });
       const res = await request(app).put('/api/orders/1/assign?transporter=Repartidor+1');
@@ -256,41 +372,65 @@ describe('orders-service', () => {
       expect(res.body.assigned_to).toBe('Repartidor 1');
     });
 
-    it('rechaza sin parámetro transporter', async () => {
+    it('rechaza sin parámetro transporter → 400 con mensaje', async () => {
       const res = await request(app).put('/api/orders/1/assign');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/transporter/i);
     });
 
+    it('rechaza transporter vacío → 400', async () => {
+      const res = await request(app).put('/api/orders/1/assign?transporter=');
+      expect(res.status).toBe(400);
+    });
+
     it('retorna 404 si orden no existe', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
-      const res = await request(app).put('/api/orders/999/assign?transporter=x');
+      const res = await request(app).put('/api/orders/999/assign?transporter=Repartidor+1');
       expect(res.status).toBe(404);
+    });
+
+    it('retorna 500 si BD falla al asignar', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).put('/api/orders/1/assign?transporter=X');
+      expect(res.status).toBe(500);
     });
   });
 
+  // ─── DELETE /api/orders/:id ─────────────────────────────────────────────────
+
   describe('DELETE /api/orders/:id', () => {
-    it('elimina una orden existente', async () => {
+    it('elimina orden existente → 200 con mensaje de confirmación', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockOrder] });
       const res = await request(app).delete('/api/orders/1');
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/eliminada/i);
     });
 
-    it('retorna 404 si orden no existe', async () => {
+    it('retorna 404 si orden no existe → mensaje de error', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).delete('/api/orders/999');
       expect(res.status).toBe(404);
+      expect(res.body.error).toBeDefined();
+    });
+
+    it('retorna 500 si BD falla al eliminar', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).delete('/api/orders/1');
+      expect(res.status).toBe(500);
     });
   });
 
+  // ─── CUSTOMERS ──────────────────────────────────────────────────────────────
+
   describe('GET /api/customers', () => {
-    it('retorna lista de clientes', async () => {
+    it('retorna lista de clientes con campos correctos', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockCustomer] });
       const res = await request(app).get('/api/customers');
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
+      expect(Array.isArray(res.body)).toBe(true);
       expect(res.body[0].name).toBe('Juan Perez');
+      expect(res.body[0].phone).toBe('999888777');
+      expect(typeof res.body[0].id).toBe('number');
     });
 
     it('retorna array vacío si no hay clientes', async () => {
@@ -299,14 +439,22 @@ describe('orders-service', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
     });
+
+    it('retorna 500 si BD falla al listar clientes', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).get('/api/customers');
+      expect(res.status).toBe(500);
+    });
   });
 
   describe('GET /api/customers/:id', () => {
-    it('retorna cliente por ID', async () => {
+    it('retorna cliente por ID con todos sus campos', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockCustomer] });
       const res = await request(app).get('/api/customers/1');
       expect(res.status).toBe(200);
       expect(res.body.name).toBe('Juan Perez');
+      expect(res.body.email).toBe('juan@example.com');
+      expect(res.body.address).toBe('Av. Lima 123');
     });
 
     it('retorna 404 si cliente no existe', async () => {
@@ -318,22 +466,25 @@ describe('orders-service', () => {
   });
 
   describe('POST /api/customers', () => {
-    it('crea cliente válido', async () => {
+    it('crea cliente válido → 201 con todos los campos del cliente', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockCustomer] });
       const res = await request(app).post('/api/customers').send({
         name: 'Juan Perez', phone: '999888777', address: 'Av. Lima 123', email: 'juan@example.com'
       });
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('Juan Perez');
+      expect(res.body.phone).toBe('999888777');
+      expect(res.body.email).toBe('juan@example.com');
+      expect(typeof res.body.id).toBe('number');
     });
 
-    it('rechaza sin nombre', async () => {
+    it('rechaza sin nombre → 400 con mensaje sobre nombre', async () => {
       const res = await request(app).post('/api/customers').send({ phone: '999' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/nombre/i);
     });
 
-    it('rechaza nombre vacío (solo espacios)', async () => {
+    it('rechaza nombre vacío (solo espacios) → 400', async () => {
       const res = await request(app).post('/api/customers').send({ name: '   ' });
       expect(res.status).toBe(400);
     });
@@ -343,41 +494,60 @@ describe('orders-service', () => {
       const res = await request(app).post('/api/customers').send({ name: 'Solo Nombre' });
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('Solo Nombre');
+      expect(res.body.phone).toBeNull();
+    });
+
+    it('retorna 500 si BD falla al crear cliente', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).post('/api/customers').send({ name: 'Test' });
+      expect(res.status).toBe(500);
     });
   });
 
   describe('PUT /api/customers/:id', () => {
-    it('actualiza cliente existente', async () => {
+    it('actualiza cliente existente → 200 con nombre actualizado', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [{ ...mockCustomer, name: 'Juan Actualizado' }] });
       const res = await request(app).put('/api/customers/1').send({ name: 'Juan Actualizado' });
       expect(res.status).toBe(200);
       expect(res.body.name).toBe('Juan Actualizado');
     });
 
-    it('rechaza actualización sin nombre', async () => {
+    it('rechaza actualización sin nombre → 400', async () => {
       const res = await request(app).put('/api/customers/1').send({ email: 'test@test.com' });
       expect(res.status).toBe(400);
     });
 
-    it('retorna 404 si cliente no existe', async () => {
+    it('retorna 404 si cliente no existe al actualizar', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).put('/api/customers/999').send({ name: 'Nadie' });
       expect(res.status).toBe(404);
     });
+
+    it('retorna 500 si BD falla al actualizar cliente', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).put('/api/customers/1').send({ name: 'Test' });
+      expect(res.status).toBe(500);
+    });
   });
 
   describe('DELETE /api/customers/:id', () => {
-    it('elimina cliente existente', async () => {
+    it('elimina cliente existente → 200 con mensaje', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockCustomer] });
       const res = await request(app).delete('/api/customers/1');
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/eliminado/i);
     });
 
-    it('retorna 404 si cliente no existe', async () => {
+    it('retorna 404 si cliente no existe al eliminar', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).delete('/api/customers/999');
       expect(res.status).toBe(404);
+    });
+
+    it('retorna 500 si BD falla al eliminar cliente', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).delete('/api/customers/1');
+      expect(res.status).toBe(500);
     });
   });
 });

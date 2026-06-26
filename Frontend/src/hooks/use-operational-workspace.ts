@@ -138,11 +138,6 @@ export function useOperationalWorkspace({
         createdAt: new Date(sale.createdAt),
       }),
     });
-    for (const item of sale.items) {
-      await apiFetch(`/api/inventory/${encodeURIComponent(item.sku)}/adjust?delta=${-item.quantity}`, {
-        method: "POST",
-      });
-    }
   }
 
   async function getAllSales(): Promise<Sale[]> {

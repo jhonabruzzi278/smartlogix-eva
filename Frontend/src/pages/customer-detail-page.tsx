@@ -38,13 +38,13 @@ export function CustomerDetailPage() {
   const badgeClass = (stage: string) =>
     stage === "entregado" ? "bg-green-50 text-green-600" :
     stage === "created" ? "bg-[#4B98CF]/10 text-[#4B98CF]" :
-    stage === "en_preparación" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
+    stage === "en_preparacion" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
     stage === "en_reparto" ? "bg-purple-50 text-purple-600" :
     stage === "cancelado" ? "bg-red-50 text-red-500" : "bg-muted text-muted-foreground";
 
   const badgeLabel = (stage: string) =>
     stage === "created" ? "Pendiente" :
-    stage === "en_preparación" ? "Preparación" :
+    stage === "en_preparacion" ? "Preparación" :
     stage === "en_reparto" ? "En reparto" :
     stage === "entregado" ? "Entregado" :
     stage === "cancelado" ? "Cancelado" : stage;

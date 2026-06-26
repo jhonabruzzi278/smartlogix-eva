@@ -12,12 +12,21 @@ import type { ApiCustomer } from "@/types/api";
 import type { Customer } from "@/types/domain";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 
+function formatRut(value: string) {
+  const clean = value.replace(/[^0-9kK]/g, "");
+  if (clean.length <= 1) return clean;
+  const dv = clean.slice(-1).toUpperCase();
+  const body = clean.slice(0, -1);
+  const formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${formatted}-${dv}`;
+}
+
 export function CustomersPage() {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
-  const [form, setForm] = useState({ name: "", phone: "", address: "", email: "" });
+  const [form, setForm] = useState({ name: "", phone: "", address: "", email: "", rut: "" });
   const [formError, setFormError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -32,7 +41,7 @@ export function CustomersPage() {
     let list = customers;
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter((c) => `${c.name} ${c.phone ?? ""} ${c.address ?? ""} ${c.email ?? ""}`.toLowerCase().includes(q));
+      list = list.filter((c) => `${c.name} ${c.phone ?? ""} ${c.address ?? ""} ${c.email ?? ""} ${c.rut ?? ""}`.toLowerCase().includes(q));
     }
     return list;
   }, [customers, query]);
@@ -47,15 +56,15 @@ export function CustomersPage() {
       if (editCustomer) {
         await apiFetch(`/api/customers/${editCustomer.id}`, {
           method: "PUT",
-          body: JSON.stringify({ name: form.name, phone: form.phone, address: form.address, email: form.email })
+          body: JSON.stringify({ name: form.name, phone: form.phone, address: form.address, email: form.email, rut: form.rut || null })
         });
       } else {
         await apiFetch("/api/customers", {
           method: "POST",
-          body: JSON.stringify({ name: form.name, phone: form.phone, address: form.address, email: form.email })
+          body: JSON.stringify({ name: form.name, phone: form.phone, address: form.address, email: form.email, rut: form.rut || null })
         });
       }
-      setForm({ name: "", phone: "", address: "", email: "" });
+      setForm({ name: "", phone: "", address: "", email: "", rut: "" });
       setEditCustomer(null);
       setDialogOpen(false);
       refresh();
@@ -68,7 +77,7 @@ export function CustomersPage() {
 
   function openEdit(c: Customer) {
     setEditCustomer(c);
-    setForm({ name: c.name, phone: c.phone ?? "", address: c.address ?? "", email: c.email ?? "" });
+    setForm({ name: c.name, phone: c.phone ?? "", address: c.address ?? "", email: c.email ?? "", rut: c.rut ?? "" });
     setDialogOpen(true);
   }
 
@@ -99,17 +108,23 @@ export function CustomersPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">RUT *</label>
+                    <Input value={form.rut} onChange={(e) => setForm({ ...form, rut: formatRut(e.target.value) })} placeholder="12.345.678-9" className="h-9 text-sm" maxLength={12} />
+                  </div>
+                  <div className="space-y-1">
                     <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Teléfono</label>
                     <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+56912345678" className="h-9 text-sm" />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Email</label>
                     <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="contacto@email.cl" className="h-9 text-sm" />
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Direccion</label>
-                  <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Av. Libertador 1234" className="h-9 text-sm" />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Dirección</label>
+                    <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Av. Libertador 1234" className="h-9 text-sm" />
+                  </div>
                 </div>
                 {formError && <p className="text-xs text-red-500">{formError}</p>}
                 <div className="flex justify-end gap-2 pt-1">
@@ -143,6 +158,7 @@ export function CustomersPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-[#112b4a]">{customer.name}</p>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#6B7280] mt-0.5">
+                  {customer.rut && <span className="font-mono font-semibold text-[#112b4a]">RUT {customer.rut}</span>}
                   {customer.phone && <span>{customer.phone}</span>}
                   {customer.email && <span>{customer.email}</span>}
                   {customer.address && <span className="truncate">{customer.address}</span>}

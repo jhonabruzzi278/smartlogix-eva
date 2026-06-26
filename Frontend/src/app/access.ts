@@ -95,9 +95,9 @@ export const roleProfiles: Record<Role, RoleAccessProfile> = {
   },
   customer: {
     label: "Cliente",
-    summary: "Consulta pedidos y envios sin intervenir la operacion interna.",
-    defaultPath: "/orders",
-    paths: ["/orders", "/customers", "/shipments", ...basePaths],
+    summary: "Consulta sus pedidos y envios sin intervenir la operacion interna.",
+    defaultPath: "/tracking",
+    paths: ["/orders", "/shipments", "/tracking", "/profile", "/notifications", "/calendar", "/reports"],
     permissions: [
       "orders.view",
       "shipments.view"

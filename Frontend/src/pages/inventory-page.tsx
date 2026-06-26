@@ -31,7 +31,7 @@ export function InventoryPage() {
   const isOwner = role === "owner";
   const isVendor = role === "vendor";
 
-  const { data: inventory, loading, refresh } = useApiQuery<ApiInventory[], Product[]>({
+  const { data: inventory, loading, error, refresh } = useApiQuery<ApiInventory[], Product[]>({
     path: "/api/inventory", transform: (r) => r.map(adaptInventory)
   });
 
@@ -72,7 +72,22 @@ export function InventoryPage() {
     totalUnits: operationalInventory.reduce((s, p) => s + p.stock, 0),
   }), [operationalInventory]);
 
-  if (!inventory) return null;
+  if (loading && !inventory) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#4B98CF] border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error && !inventory) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-2">
+        <p className="text-sm font-medium text-red-500">{error}</p>
+        <button onClick={refresh} className="text-xs text-[#4B98CF] hover:underline">Reintentar</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-sm w-full mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">

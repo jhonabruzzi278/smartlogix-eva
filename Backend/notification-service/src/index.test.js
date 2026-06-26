@@ -18,11 +18,25 @@ const validNotification = {
   orderId: 1,
   customerId: 10,
   stage: 'SHIPMENT_CREATED',
-  status: 'info',
-  message: 'Pedido creado',
+  status: 'NOTIFIED',
+  message: 'Pedido creado correctamente',
   sourceService: 'shipping-service',
   audience: 'BOTH',
   occurredAt: new Date().toISOString()
+};
+
+const mockRecord = {
+  id: 1,
+  event_id: 'evt-001',
+  order_id: 1,
+  customer_id: 10,
+  stage: 'SHIPMENT_CREATED',
+  status: 'NOTIFIED',
+  message: 'Pedido creado correctamente',
+  target_audience: 'BOTH',
+  source_service: 'shipping-service',
+  occurred_at: new Date().toISOString(),
+  received_at: new Date().toISOString()
 };
 
 describe('notification-service', () => {
@@ -31,129 +45,226 @@ describe('notification-service', () => {
     mockQuery.mockResolvedValue({ rows: [] });
   });
 
+  // ─── HEALTH ────────────────────────────────────────────────────────────────
+
   describe('GET /health', () => {
-    it('retorna UP cuando BD disponible', async () => {
+    it('retorna UP con db=connected cuando BD está disponible', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [1] });
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('UP');
+      expect(res.body).toMatchObject({ status: 'UP', db: 'connected' });
     });
 
-    it('retorna DEGRADED cuando BD falla', async () => {
-      mockQuery.mockRejectedValueOnce(new Error('DB Error'));
+    it('retorna 503 DEGRADED cuando BD falla', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
       const res = await request(app).get('/health');
       expect(res.status).toBe(503);
       expect(res.body.status).toBe('DEGRADED');
     });
   });
 
+  // ─── POST /api/notifications ────────────────────────────────────────────────
+
   describe('POST /api/notifications', () => {
-    it('acepta notificación válida (ACCEPTED)', async () => {
+    it('crea notificación válida → 201 con status ACCEPTED y eventId', async () => {
       mockQuery
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] });
+        .mockResolvedValueOnce({ rows: [] })        // SELECT idempotencia
+        .mockResolvedValueOnce({ rows: [] });        // INSERT
       const res = await request(app).post('/api/notifications').send(validNotification);
-      expect(res.status).toBe(202);
-      expect(res.body.status).toBe('ACCEPTED');
-      expect(res.body.eventId).toBe('evt-001');
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ status: 'ACCEPTED', eventId: 'evt-001' });
+      expect(typeof res.body.eventId).toBe('string');
     });
 
-    it('retorna DUPLICATE para eventId ya existente', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    it('retorna 409 DUPLICATE para eventId+audience ya existente', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 1 }] }); // duplicado encontrado
       const res = await request(app).post('/api/notifications').send(validNotification);
-      expect(res.status).toBe(202);
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ status: 'DUPLICATE', eventId: 'evt-001' });
+    });
+
+    it('retorna 409 DUPLICATE por violación de constraint único (code 23505)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(Object.assign(new Error('unique violation'), { code: '23505' }));
+      const res = await request(app).post('/api/notifications').send(validNotification);
+      expect(res.status).toBe(409);
       expect(res.body.status).toBe('DUPLICATE');
     });
 
-    it('retorna DUPLICATE por violación de constraint único (code 23505)', async () => {
-      mockQuery
-        .mockResolvedValueOnce({ rows: [] })
-        .mockRejectedValueOnce(Object.assign(new Error('unique'), { code: '23505' }));
-      const res = await request(app).post('/api/notifications').send(validNotification);
-      expect(res.status).toBe(202);
-      expect(res.body.status).toBe('DUPLICATE');
-    });
-
-    it('rechaza notificación sin eventId', async () => {
+    it('rechaza sin eventId → 400 con mensaje descriptivo', async () => {
       const { eventId, ...sin } = validNotification;
       const res = await request(app).post('/api/notifications').send(sin);
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/eventId/i);
     });
 
-    it('rechaza sin orderId', async () => {
+    it('rechaza sin orderId → 400', async () => {
       const { orderId, ...sin } = validNotification;
       const res = await request(app).post('/api/notifications').send(sin);
       expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/orderId/i);
     });
 
-    it('rechaza sin stage', async () => {
+    it('rechaza sin stage → 400', async () => {
       const { stage, ...sin } = validNotification;
       const res = await request(app).post('/api/notifications').send(sin);
       expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/stage/i);
     });
 
-    it('rechaza sin message', async () => {
+    it('rechaza sin message → 400', async () => {
       const { message, ...sin } = validNotification;
       const res = await request(app).post('/api/notifications').send(sin);
       expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/message/i);
     });
 
-    it('usa BOTH como audience por defecto', async () => {
+    it('usa BOTH como audience por defecto cuando no se envía', async () => {
       const { audience, ...sin } = validNotification;
       mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] });
       const res = await request(app).post('/api/notifications').send(sin);
-      expect(res.status).toBe(202);
+      expect(res.status).toBe(201);
       expect(res.body.status).toBe('ACCEPTED');
+      // La 1ª consulta SELECT debe buscar con target_audience='BOTH'
+      expect(mockQuery.mock.calls[0][1]).toContain('BOTH');
+    });
+
+    it('normaliza audience a mayúsculas antes de persistir', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).post('/api/notifications')
+        .send({ ...validNotification, audience: 'both' });
+      expect(res.status).toBe(201);
+      expect(mockQuery.mock.calls[0][1]).toContain('BOTH');
+    });
+
+    it('no requiere customerId (default 0)', async () => {
+      const { customerId, ...sin } = validNotification;
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).post('/api/notifications').send(sin);
+      expect(res.status).toBe(201);
+    });
+
+    it('no requiere occurredAt (default NOW())', async () => {
+      const { occurredAt, ...sin } = validNotification;
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).post('/api/notifications').send(sin);
+      expect(res.status).toBe(201);
+    });
+
+    it('retorna 500 si la BD lanza error inesperado', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).post('/api/notifications').send(validNotification);
+      expect(res.status).toBe(500);
     });
   });
+
+  // ─── GET /api/notifications/order/:orderId ──────────────────────────────────
 
   describe('GET /api/notifications/order/:orderId', () => {
-    it('retorna eventos de una orden', async () => {
-      const mockEvents = [
-        { id: 1, order_id: 1, stage: 'SHIPMENT_CREATED', message: 'Creado' }
-      ];
-      mockQuery.mockResolvedValueOnce({ rows: mockEvents });
+    it('retorna array de eventos de una orden con campos correctos', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [mockRecord] });
       const res = await request(app).get('/api/notifications/order/1');
       expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
       expect(res.body).toHaveLength(1);
-      expect(res.body[0].order_id).toBe(1);
+      const notif = res.body[0];
+      expect(notif.order_id).toBe(1);
+      expect(notif.stage).toBe('SHIPMENT_CREATED');
+      expect(notif.target_audience).toBe('BOTH');
+      expect(typeof notif.message).toBe('string');
     });
 
-    it('retorna array vacío si no hay notificaciones', async () => {
+    it('retorna múltiples eventos ordenados por occurred_at', async () => {
+      const events = [
+        { ...mockRecord, id: 1, stage: 'SHIPMENT_CREATED' },
+        { ...mockRecord, id: 2, stage: 'SHIPMENT_IN_TRANSIT' },
+        { ...mockRecord, id: 3, stage: 'SHIPMENT_DELIVERED' }
+      ];
+      mockQuery.mockResolvedValueOnce({ rows: events });
+      const res = await request(app).get('/api/notifications/order/1');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(3);
+      expect(res.body[0].stage).toBe('SHIPMENT_CREATED');
+      expect(res.body[2].stage).toBe('SHIPMENT_DELIVERED');
+    });
+
+    it('retorna 404 si no hay notificaciones para la orden', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).get('/api/notifications/order/999');
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual([]);
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBeDefined();
+    });
+
+    it('retorna 500 si BD falla en GET /order/:orderId', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB error'));
+      const res = await request(app).get('/api/notifications/order/1');
+      expect(res.status).toBe(500);
     });
   });
 
+  // ─── GET /api/notifications/audience/:audience ──────────────────────────────
+
   describe('GET /api/notifications/audience/:audience', () => {
+    it('retorna notificaciones para audiencia CLIENT', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...mockRecord, target_audience: 'CLIENT' }] });
+      const res = await request(app).get('/api/notifications/audience/CLIENT');
+      expect(res.status).toBe(200);
+      expect(res.body[0].target_audience).toBe('CLIENT');
+    });
+
     it('retorna notificaciones para audiencia OPERATOR', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: 1, target_audience: 'OPERATOR' }] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...mockRecord, target_audience: 'OPERATOR' }] });
       const res = await request(app).get('/api/notifications/audience/OPERATOR');
       expect(res.status).toBe(200);
       expect(res.body[0].target_audience).toBe('OPERATOR');
     });
 
-    it('acepta CLIENT en minúsculas (normaliza a uppercase)', async () => {
+    it('acepta BOTH en minúsculas (normaliza a uppercase)', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
-      const res = await request(app).get('/api/notifications/audience/client');
+      const res = await request(app).get('/api/notifications/audience/both');
       expect(res.status).toBe(200);
     });
 
-    it('acepta BOTH', async () => {
+    it('acepta customer como alias de CLIENT', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
-      const res = await request(app).get('/api/notifications/audience/BOTH');
+      const res = await request(app).get('/api/notifications/audience/customer');
       expect(res.status).toBe(200);
     });
 
-    it('rechaza audiencia inválida', async () => {
+    it('acepta CUSTOMER (mayúsculas) como alias de CLIENT', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/notifications/audience/CUSTOMER');
+      expect(res.status).toBe(200);
+    });
+
+    it('rechaza audiencia completamente inválida → 400 con mensaje', async () => {
       const res = await request(app).get('/api/notifications/audience/UNKNOWN');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/audience invalido/i);
+    });
+
+    it('retorna array vacío cuando audiencia válida no tiene registros', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      const res = await request(app).get('/api/notifications/audience/BOTH');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('retorna 500 si BD falla en GET /audience/:audience', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB error'));
+      const res = await request(app).get('/api/notifications/audience/BOTH');
+      expect(res.status).toBe(500);
     });
   });
 });

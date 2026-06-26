@@ -1,10 +1,12 @@
 ﻿import { useEffect, useState, useMemo } from "react";
-import { Clock, FileText, Inbox, Package, Search, Truck, User, X } from "lucide-react";
+import { Clock, FileText, Inbox, Package, Search, Trash2, Truck, User, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { managedUsers } from "@/app/user-directory";
 import { Input } from "@/components/ui/input";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
+import { apiFetch } from "@/lib/api-client";
+import { clearHistory } from "@/lib/order-history";
 import { cn } from "@/lib/utils";
 import type { ApiOrder, ApiShipment } from "@/types/api";
 import type { Order, Shipment } from "@/types/domain";
@@ -163,6 +165,19 @@ export function NotificationsPage() {
     setClearedIds(new Set(filtered.map((n) => n.id)));
   }
 
+  async function clearDatabase() {
+    if (!confirm("Esto eliminara todo el historial de notificaciones de la base de datos. Continuar?")) return;
+    try {
+      await apiFetch("/api/notifications", { method: "DELETE" });
+      clearHistory();
+      localStorage.removeItem("smartlogix-pos-cart:v1");
+      setClearedIds(new Set(notifications.map((n) => n.id)));
+      alert("Base de datos de notificaciones vaciada correctamente.");
+    } catch {
+      alert("Error al vaciar la base de datos.");
+    }
+  }
+
   function formatTime(iso: string) {
     const d = new Date(iso);
     const now = new Date();
@@ -189,6 +204,12 @@ export function NotificationsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={clearDatabase}
+            className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 flex items-center gap-1"
+          >
+            <Trash2 className="h-3 w-3" /> Vaciar BD
+          </button>
           <button
             onClick={markAllRead}
             className="rounded border border-[#DCE0E2] px-3 py-1.5 text-xs font-semibold text-[#4B98CF] hover:bg-[#F5F7F9]"

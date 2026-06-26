@@ -56,7 +56,7 @@ export function CalendarPage() {
           quantity: 2,
           carrier: "Transportista asignado",
           tracking: `SLX-${year}${month + 1}${d.toString().padStart(2, "0")}`,
-          stage: "en_preparación",
+          stage: "en_preparacion",
           eta: null,
           createdAt: new Date(year, month, d).toISOString(),
           shippedAt: null,
@@ -158,7 +158,7 @@ export function CalendarPage() {
                               "flex items-center gap-1 truncate rounded px-0.5 sm:px-1 py-0.5 text-[8px] sm:text-[9px] font-medium",
                               s.stage === "entregado" && "bg-green-50 text-green-600",
                               s.stage === "en_reparto" && "bg-[#4B98CF]/10 text-[#4B98CF]",
-                              s.stage === "en_preparación" && "bg-[#E3AA75]/10 text-[#E3AA75]",
+                              s.stage === "en_preparacion" && "bg-[#E3AA75]/10 text-[#E3AA75]",
                               s.stage === "cancelado" && "bg-red-50 text-red-500",
                               s.id.startsWith("sched-") && "bg-purple-50 text-purple-600",
                             )}
@@ -219,7 +219,7 @@ export function CalendarPage() {
                       s.stage === "en_reparto" && "bg-[#4B98CF]/10 text-[#4B98CF]",
                       s.stage === "cancelado" && "bg-red-50 text-red-500",
                     )}>
-                      {s.stage === "en_preparación" ? "Preparación" : s.stage === "en_reparto" ? "En reparto" : s.stage === "entregado" ? "Entregado" : s.stage === "cancelado" ? "Cancelado" : s.stage}
+                      {s.stage === "en_preparacion" ? "Preparación" : s.stage === "en_reparto" ? "En reparto" : s.stage === "entregado" ? "Entregado" : s.stage === "cancelado" ? "Cancelado" : s.stage}
                     </span>
                   </Link>
                 ))}

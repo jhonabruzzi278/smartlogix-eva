@@ -66,6 +66,14 @@ export const REGISTERED_USERS: RegisteredUser[] = [
     groups: ["vendedor", "vendor"],
     team: "Ventas",
     summary: "Vendedor de tienda. Responsable de atencion al cliente y registro de ventas."
+  },
+  {
+    username: "cliente@smartlogix.cl",
+    name: "Cliente Demo",
+    role: "customer",
+    groups: ["cliente", "customer"],
+    team: "Clientes",
+    summary: "Cliente final. Consulta sus pedidos y rastrea envios."
   }
 ];
 

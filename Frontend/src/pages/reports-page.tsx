@@ -494,15 +494,15 @@ export function ReportsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="rounded bg-[#F5F7F9] p-4 text-center">
                       <p className="text-2xl font-bold text-[#4EB4A5]">{filteredShipments.filter((s) => s.stage === "entregado").length}</p>
-
-  . . .
-
-              <p className="text-2xl font-bold text-[#CF4B4B]">{filteredShipments.filter((s) => s.stage === "cancelado").length}</p>
-
-  . . .
-
-              <p className="text-2xl font-bold text-[#E3AA75]">{filteredShipments.filter((s) => s.stage === "en_preparación" || s.stage === "en_reparto").length}</p>
-                      <p className="text-[10px] font-medium text-[#6B7280]">En preparación</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">Entregados</p>
+                    </div>
+                    <div className="rounded bg-[#F5F7F9] p-4 text-center">
+                      <p className="text-2xl font-bold text-[#CF4B4B]">{filteredShipments.filter((s) => s.stage === "cancelado").length}</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">Cancelados</p>
+                    </div>
+                    <div className="rounded bg-[#F5F7F9] p-4 text-center">
+                      <p className="text-2xl font-bold text-[#E3AA75]">{filteredShipments.filter((s) => s.stage === "en_preparacion" || s.stage === "en_reparto").length}</p>
+                      <p className="text-[10px] font-medium text-[#6B7280]">En preparacion</p>
                     </div>
                   </div>
                 </div>

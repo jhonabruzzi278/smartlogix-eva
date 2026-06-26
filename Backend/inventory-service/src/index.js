@@ -5,10 +5,23 @@ const log = require('../shared/logger');
 const { app, pool, sendError, start } = createApp('inventory_db', process.env.PORT || 8082);
 
 async function ensureTables() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS inventory (id SERIAL PRIMARY KEY, sku VARCHAR(100) NOT NULL, stock INTEGER DEFAULT 0)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS inventory (
+    id SERIAL PRIMARY KEY, sku VARCHAR(100) NOT NULL, stock INTEGER DEFAULT 0,
+    name VARCHAR(200), price INTEGER DEFAULT 0, cost INTEGER DEFAULT 0,
+    category VARCHAR(30) DEFAULT 'otros')`);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_sku ON inventory (sku)`);
   await pool.query(`CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, sku VARCHAR(100) NOT NULL, quantity INTEGER NOT NULL, sale_date TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS processed_events (event_type VARCHAR(64) NOT NULL, event_key VARCHAR(128) NOT NULL, processed_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (event_type, event_key))`);
+  await pool.query(`ALTER TABLE inventory ADD COLUMN IF NOT EXISTS name VARCHAR(200)`).catch(() => {});
+  await pool.query(`ALTER TABLE inventory ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE inventory ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE inventory ADD COLUMN IF NOT EXISTS category VARCHAR(30) DEFAULT 'otros'`).catch(() => {});
+  await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_group VARCHAR(50)`).catch(() => {});
+  await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20)`).catch(() => {});
+  await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vendor_id VARCHAR(100)`).catch(() => {});
+  await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vendor_name VARCHAR(200)`).catch(() => {});
+  await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS unit_price INTEGER DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS total INTEGER DEFAULT 0`).catch(() => {});
 }
 
 async function ensureProcedures() {
@@ -70,7 +83,9 @@ app.post('/api/inventory', async (req, res) => {
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
     if ((await pool.query('SELECT 1 FROM inventory WHERE sku=$1', [req.body.sku])).rows.length)
       return res.status(409).json({ error: 'SKU ya existe' });
-    const result = await pool.query('INSERT INTO inventory (sku, stock) VALUES ($1,$2) RETURNING *', [req.body.sku, req.body.stock || 0]);
+    const result = await pool.query(
+      'INSERT INTO inventory (sku, stock, name, price, cost, category) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      [req.body.sku, req.body.stock || 0, req.body.name || null, req.body.price || 0, req.body.cost || 0, req.body.category || 'otros']);
     res.status(201).json(result.rows[0]);
   } catch (err) { sendError(res, 500, 'Failed to create inventory', err); }
 });
@@ -114,17 +129,88 @@ app.get('/api/sales', async (_req, res) => {
 });
 
 app.post('/api/sales', async (req, res) => {
+  const client = await pool.connect();
   try {
     const errors = validateSaleBody(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
-    const r = await pool.query('UPDATE inventory SET stock=stock-$1 WHERE sku=$2 AND stock>=$1 RETURNING *', [req.body.quantity, req.body.sku]);
+
+    if (req.body.items) {
+      let saleItems;
+      try {
+        saleItems = typeof req.body.items === 'string' ? JSON.parse(req.body.items) : req.body.items;
+      } catch {
+        return res.status(400).json({ error: 'items debe ser un JSON valido' });
+      }
+      if (!Array.isArray(saleItems) || saleItems.length === 0) {
+        return res.status(400).json({ error: 'items debe ser un arreglo no vacio' });
+      }
+
+      await client.query('BEGIN');
+
+      // lock all rows first to prevent race conditions
+      const insufficient = [];
+      for (const item of saleItems) {
+        if (!item.sku || !item.quantity || item.quantity < 1) {
+          insufficient.push(`Item invalido: sku=${item.sku} qty=${item.quantity}`);
+          continue;
+        }
+        const r = await client.query(
+          'SELECT stock FROM inventory WHERE sku=$1 FOR UPDATE',
+          [item.sku]
+        );
+        if (!r.rows.length) {
+          insufficient.push(`SKU no encontrado: ${item.sku}`);
+        } else if (r.rows[0].stock < item.quantity) {
+          insufficient.push(`Stock insuficiente: ${item.sku} (disponible: ${r.rows[0].stock}, solicitado: ${item.quantity})`);
+        }
+      }
+
+      if (insufficient.length > 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({ error: insufficient.join('; ') });
+      }
+
+      const saleGroup = `POS-${Date.now()}`;
+      const results = [];
+
+      for (const item of saleItems) {
+        await client.query(
+          'UPDATE inventory SET stock=stock-$1 WHERE sku=$2',
+          [item.quantity, item.sku]
+        );
+        const sale = (await client.query(
+          'INSERT INTO sales (sku, quantity, sale_group, payment_method, vendor_id, vendor_name, unit_price, total, sale_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *',
+          [item.sku, item.quantity, saleGroup, req.body.paymentMethod || 'cash', req.body.vendorId || 'unknown', req.body.vendorName || '', item.unitPrice || 0, item.subtotal || 0]
+        )).rows[0];
+        results.push(sale);
+      }
+
+      await client.query('COMMIT');
+      client.release();
+
+      res.status(201).json({ saleGroup, items: results, total: req.body.total });
+      return;
+    }
+
+    // single-item sale
+    const r = await client.query(
+      'UPDATE inventory SET stock=stock-$1 WHERE sku=$2 AND stock>=$1 RETURNING *',
+      [req.body.quantity, req.body.sku]
+    );
     if (!r.rows.length) {
-      const exists = await pool.query('SELECT 1 FROM inventory WHERE sku=$1', [req.body.sku]);
+      const exists = await client.query('SELECT 1 FROM inventory WHERE sku=$1', [req.body.sku]);
+      client.release();
       return res.status(exists.rows.length ? 400 : 404).json({ error: exists.rows.length ? 'Stock insuficiente' : 'SKU no encontrado' });
     }
-    const sale = (await pool.query('INSERT INTO sales (sku, quantity) VALUES ($1,$2) RETURNING *', [req.body.sku, req.body.quantity])).rows[0];
+    const sale = (await client.query('INSERT INTO sales (sku, quantity) VALUES ($1,$2) RETURNING *', [req.body.sku, req.body.quantity])).rows[0];
+    client.release();
     res.status(201).json(sale);
-  } catch (err) { sendError(res, 500, 'Failed to record sale', err); }
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    client.release();
+    sendError(res, 500, 'Failed to record sale', err);
+  }
 });
 
 if (require.main === module) {

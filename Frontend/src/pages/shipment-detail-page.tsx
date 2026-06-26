@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Camera, Check, Clock, Package, Truck, User, QrCode } from "lucide-react";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
+import { usePermissions } from "@/hooks/use-permissions";
 import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { cn } from "@/lib/utils";
 import type { ApiOrder, ApiShipment } from "@/types/api";
@@ -21,6 +22,7 @@ function getStepIndex(stage: string) {
 export function ShipmentDetailPage() {
   const { shipmentId } = useParams();
   const id = Number(shipmentId);
+  const { role } = usePermissions();
 
   const { data: shipments, loading } = useApiQuery<ApiShipment[], Shipment[]>({
     path: "/api/shipments", transform: (r) => r.map(adaptShipment)
@@ -39,7 +41,14 @@ export function ShipmentDetailPage() {
     return map;
   }, [orders]);
 
+  const clientCodes = useMemo(() => {
+    const map = new Map<string, string>();
+    (orders ?? []).forEach((o) => { if (o.clientCode) map.set(String(o.id), o.clientCode); });
+    return map;
+  }, [orders]);
+
   const customerName = shipment ? (customerNames.get(shipment.orderId) ?? "Cliente") : "";
+  const orderClientCode = shipment ? (clientCodes.get(shipment.orderId) ?? null) : null;
   const step = shipment ? getStepIndex(shipment.stage) : 0;
   const isCancelled = shipment?.stage === "cancelado";
 
@@ -73,7 +82,7 @@ export function ShipmentDetailPage() {
           shipment.stage === "cancelado" ? "bg-red-50 text-red-500" :
           "bg-[#E3AA75]/10 text-[#E3AA75]"
         )}>
-          {shipment.stage === "en_preparación" ? "Preparación" :
+          {shipment.stage === "en_preparacion" ? "Preparación" :
            shipment.stage === "en_reparto" ? "En reparto" :
            shipment.stage === "entregado" ? "Entregado" :
            shipment.stage === "cancelado" ? "Cancelado" : shipment.stage}
@@ -112,7 +121,7 @@ export function ShipmentDetailPage() {
       )}
 
       {/* QR code for pickup - show when EN_PREPARACION */}
-      {shipment.stage === "en_preparación" && (
+      {shipment.stage === "en_preparacion" && (
         <div className="rounded border border-[#DCE0E2] bg-white p-5">
           <div className="flex items-center gap-2 mb-3">
             <QrCode className="h-4 w-4 text-[#4B98CF]" />
@@ -126,6 +135,23 @@ export function ShipmentDetailPage() {
             </div>
           </div>
           <p className="text-xs text-[#6B7280] text-center mt-3">Escanea para confirmar retiro de la tienda</p>
+        </div>
+      )}
+
+      {/* Código del cliente — never shown to shipper (also stripped server-side) */}
+      {role !== "shipper" && orderClientCode && (
+        <div className="rounded border border-[#4B98CF]/40 bg-[#4B98CF]/5 p-5">
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#4B98CF] mb-2">Código del cliente</p>
+          <p className="text-xs text-[#6B7280] mb-3">Entrega este código al cliente para que pueda rastrear su pedido en <span className="font-mono text-[#4B98CF]">/tracking</span></p>
+          <div className="flex items-center justify-between rounded-lg bg-white border border-[#4B98CF]/30 px-4 py-3">
+            <span className="text-2xl font-bold font-mono tracking-widest text-[#112b4a]">{orderClientCode}</span>
+            <button
+              onClick={() => navigator.clipboard.writeText(orderClientCode)}
+              className="text-xs font-semibold text-[#4B98CF] hover:text-[#346384] border border-[#4B98CF]/30 rounded px-3 py-1.5 hover:bg-[#4B98CF]/5 transition-colors"
+            >
+              Copiar
+            </button>
+          </div>
         </div>
       )}
 

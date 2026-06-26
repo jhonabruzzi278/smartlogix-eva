@@ -1,16 +1,19 @@
 ﻿const { createApp } = require('../shared/app');
 const { validateShipmentBody, validateShipmentStage } = require('../shared/validate');
+const { sendEmail, buildOrderConfirmationEmail, buildShipmentUpdateEmail } = require('../shared/email');
 const log = require('../shared/logger');
 
 const { app, pool, sendError, start } = createApp('shipping_db', process.env.PORT || 8084);
 const NOTIFICATION_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:8085';
+const ORDERS_URL = process.env.ORDERS_SERVICE_URL || 'http://orders-service:8081';
 
 async function ensureTables() {
   await pool.query(`CREATE TABLE IF NOT EXISTS shipments (
-    id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL, customer_id INTEGER NOT NULL,
+    id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL, customer_id INTEGER DEFAULT 0,
     sku VARCHAR(100) NOT NULL, quantity INTEGER NOT NULL, status VARCHAR(30) DEFAULT 'EN_PREPARACION',
     tracking_number VARCHAR(20), created_at TIMESTAMP DEFAULT NOW(), shipped_at TIMESTAMP,
     customer_code VARCHAR(20), recipient_rut VARCHAR(15), proof_of_delivery_image TEXT)`);
+  await pool.query(`ALTER TABLE shipments ALTER COLUMN customer_id DROP NOT NULL`).catch(() => {});
   await pool.query(`CREATE TABLE IF NOT EXISTS processed_events (event_type VARCHAR(64) NOT NULL, event_key VARCHAR(128) NOT NULL, processed_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (event_type, event_key))`);
 }
 
@@ -37,7 +40,8 @@ app.post('/api/shipments', async (req, res) => {
   try {
     const errors = validateShipmentBody(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
-    const { orderId, customerId, sku, quantity } = req.body;
+    const { orderId, sku, quantity } = req.body;
+    const customerId = req.body.customerId || 0;
     if ((await pool.query('SELECT 1 FROM shipments WHERE order_id=$1', [orderId])).rows.length)
       return res.status(409).json({ error: `Ya existe envío para orden ${orderId}` });
     const tracking = 'TRACK-' + require('uuid').v4().substring(0, 8).toUpperCase();
@@ -59,13 +63,53 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
     if (stage === 'EN_REPARTO') {
       updated = (await pool.query("UPDATE shipments SET status='EN_REPARTO',shipped_at=NOW() WHERE id=$1 RETURNING *", [req.params.id])).rows[0];
       notifStage = 'SHIPMENT_IN_TRANSIT'; notifMsg = `Envío en reparto - ${updated.tracking_number}`;
+      try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=EN_REPARTO`, { method: 'PUT' }); }
+      catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
     } else if (stage === 'ENTREGADO') {
       const p = req.body || {};
-      updated = (await pool.query("UPDATE shipments SET status='ENTREGADO',customer_code=$1,recipient_rut=$2 WHERE id=$3 RETURNING *", [p.customerCode||'', p.recipientRut||'', req.params.id])).rows[0];
+      const normalizeRut = (r) => (r || '').replace(/[.\-\s]/g, '').toUpperCase();
+
+      let orderData = null;
+      let customerData = null;
+      try {
+        const orderRes = await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}`);
+        if (orderRes.ok) orderData = await orderRes.json();
+      } catch (e) { log.warn('Could not fetch order for validation', { orderId: shipment.order_id, message: e.message }); }
+
+      if (orderData && orderData.client_code) {
+        const expected = (orderData.client_code).toUpperCase().trim();
+        const provided = (p.customerCode || '').toUpperCase().trim();
+        if (provided !== expected) {
+          return res.status(400).json({ error: 'Código de cliente incorrecto. Verifica el código proporcionado por el cliente.' });
+        }
+      }
+
+      if (shipment.customer_id && shipment.customer_id !== 0) {
+        try {
+          const custRes = await fetch(`${ORDERS_URL}/api/customers/${shipment.customer_id}`);
+          if (custRes.ok) customerData = await custRes.json();
+        } catch (e) { log.warn('Could not fetch customer for validation', { customerId: shipment.customer_id, message: e.message }); }
+
+        if (customerData && customerData.rut) {
+          const expectedRut = normalizeRut(customerData.rut);
+          const providedRut = normalizeRut(p.recipientRut);
+          if (providedRut !== expectedRut) {
+            return res.status(400).json({ error: 'RUT incorrecto. No coincide con el RUT del cliente registrado.' });
+          }
+        }
+      }
+
+      updated = (await pool.query("UPDATE shipments SET status='ENTREGADO',customer_code=$1,recipient_rut=$2,proof_of_delivery_image=$3 WHERE id=$4 RETURNING *", [p.customerCode||'', p.recipientRut||'', p.proofOfDeliveryImage||null, req.params.id])).rows[0];
       notifStage = 'SHIPMENT_DELIVERED'; notifMsg = `Envío entregado - ${updated.tracking_number}`;
+      try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=ENTREGADO`, { method: 'PUT' }); }
+      catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
     } else {
       updated = (await pool.query('UPDATE shipments SET status=$1 WHERE id=$2 RETURNING *', [stage, req.params.id])).rows[0];
       notifStage = 'SHIPMENT_CANCELLED'; notifMsg = `Envío cancelado - ${updated.tracking_number}`;
+      if (stage === 'CANCELADO') {
+        try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=CANCELADO`, { method: 'PUT' }); }
+        catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
+      }
     }
     await sendNotification(updated, notifStage, notifMsg);
     res.json(updated);

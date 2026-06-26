@@ -30,28 +30,36 @@ describe('shipping-service', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });
 
+  // ─── HEALTH ────────────────────────────────────────────────────────────────
+
   describe('GET /health', () => {
-    it('retorna UP cuando BD disponible', async () => {
+    it('retorna 200 UP con db=connected cuando BD disponible', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [1] });
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
-      expect(res.body.status).toBe('UP');
+      expect(res.body).toMatchObject({ status: 'UP', db: 'connected' });
     });
 
-    it('retorna DEGRADED cuando BD falla', async () => {
+    it('retorna 503 DEGRADED cuando BD falla', async () => {
       mockQuery.mockRejectedValueOnce(new Error('DB Error'));
       const res = await request(app).get('/health');
       expect(res.status).toBe(503);
+      expect(res.body.status).toBe('DEGRADED');
     });
   });
 
+  // ─── GET /api/shipments ─────────────────────────────────────────────────────
+
   describe('GET /api/shipments', () => {
-    it('retorna lista de envíos', async () => {
+    it('retorna lista de envíos con todos los campos del envío', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockShipment] });
       const res = await request(app).get('/api/shipments');
       expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].tracking_number).toBe('TRACK-UUID-123');
+      expect(res.body[0].status).toBe('EN_PREPARACION');
+      expect(res.body[0].sku).toBe('COCA-2L');
     });
 
     it('retorna array vacío si no hay envíos', async () => {
@@ -60,73 +68,122 @@ describe('shipping-service', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
     });
+
+    it('retorna 500 si BD falla al listar envíos', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).get('/api/shipments');
+      expect(res.status).toBe(500);
+    });
   });
 
+  // ─── GET /api/shipments/:orderId ────────────────────────────────────────────
+
   describe('GET /api/shipments/:orderId', () => {
-    it('retorna envío por orderId', async () => {
+    it('retorna envío por orderId con order_id, sku, status, tracking_number', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockShipment] });
       const res = await request(app).get('/api/shipments/1');
       expect(res.status).toBe(200);
       expect(res.body.order_id).toBe(1);
+      expect(res.body.sku).toBe('COCA-2L');
+      expect(res.body.status).toBe('EN_PREPARACION');
+      expect(typeof res.body.tracking_number).toBe('string');
     });
 
-    it('retorna 404 si no existe envío para esa orden', async () => {
+    it('retorna 404 con error si no existe envío para esa orden', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).get('/api/shipments/999');
       expect(res.status).toBe(404);
       expect(res.body.error).toMatch(/no encontrado/i);
     });
+
+    it('retorna 500 si BD falla al buscar por orderId', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).get('/api/shipments/1');
+      expect(res.status).toBe(500);
+    });
   });
 
+  // ─── POST /api/shipments ────────────────────────────────────────────────────
+
   describe('POST /api/shipments', () => {
-    it('crea envío válido y genera tracking', async () => {
+    it('crea envío válido → 201 con tracking_number formato TRACK-*', async () => {
       mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [mockShipment] });
       const res = await request(app).post('/api/shipments').send(validShipmentBody);
       expect(res.status).toBe(201);
-      expect(res.body.tracking_number).toBe('TRACK-UUID-123');
+      expect(res.body.tracking_number).toMatch(/^TRACK-/);
+      expect(res.body.status).toBe('EN_PREPARACION');
+      expect(res.body.order_id).toBe(1);
+    });
+
+    it('crea envío y llama exactamente 1 vez al notification-service', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [mockShipment] });
+      const res = await request(app).post('/api/shipments').send(validShipmentBody);
+      expect(res.status).toBe(201);
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('rechaza body sin orderId', async () => {
+    it('crea envío sin customerId (campo opcional, default 0)', async () => {
+      const { customerId, ...sinCustId } = validShipmentBody;
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ ...mockShipment, customer_id: 0 }] });
+      const res = await request(app).post('/api/shipments').send(sinCustId);
+      expect(res.status).toBe(201);
+      expect(res.body.order_id).toBe(1);
+    });
+
+    it('rechaza sin orderId → 400 con mensaje sobre orderId', async () => {
       const { orderId, ...sin } = validShipmentBody;
       const res = await request(app).post('/api/shipments').send(sin);
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/orderId/i);
     });
 
-    it('rechaza body sin sku', async () => {
+    it('rechaza sin sku → 400', async () => {
       const { sku, ...sin } = validShipmentBody;
       const res = await request(app).post('/api/shipments').send(sin);
       expect(res.status).toBe(400);
     });
 
-    it('rechaza body sin quantity', async () => {
+    it('rechaza sin quantity → 400', async () => {
       const { quantity, ...sin } = validShipmentBody;
       const res = await request(app).post('/api/shipments').send(sin);
       expect(res.status).toBe(400);
     });
 
-    it('retorna 409 si ya existe envío para la orden', async () => {
+    it('retorna 409 con mensaje si ya existe envío para la orden', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 1 }] });
       const res = await request(app).post('/api/shipments').send(validShipmentBody);
       expect(res.status).toBe(409);
       expect(res.body.error).toMatch(/Ya existe envío/i);
     });
 
-    it('sigue creando aunque falle la notificación', async () => {
+    it('sigue creando envío aunque notification-service falle', async () => {
       mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [mockShipment] });
-      global.fetch = jest.fn().mockRejectedValue(new Error('Network fail'));
+      global.fetch = jest.fn().mockRejectedValue(new Error('Notification service down'));
       const res = await request(app).post('/api/shipments').send(validShipmentBody);
       expect(res.status).toBe(201);
     });
+
+    it('retorna 500 si BD falla al crear el envío', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).post('/api/shipments').send(validShipmentBody);
+      expect(res.status).toBe(500);
+    });
   });
 
+  // ─── PUT /api/shipments/:id/stage ──────────────────────────────────────────
+
   describe('PUT /api/shipments/:id/stage', () => {
-    it('cambia stage a EN_REPARTO', async () => {
+    it('cambia a EN_REPARTO → body status=EN_REPARTO, notifica 1 vez', async () => {
       const enReparto = { ...mockShipment, status: 'EN_REPARTO', shipped_at: new Date().toISOString() };
       mockQuery
         .mockResolvedValueOnce({ rows: [mockShipment] })
@@ -137,7 +194,7 @@ describe('shipping-service', () => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('cambia stage a ENTREGADO con datos de entrega', async () => {
+    it('cambia a ENTREGADO con datos de entrega → body tiene customer_code y recipient_rut', async () => {
       const entregado = { ...mockShipment, status: 'ENTREGADO', customer_code: 'C123', recipient_rut: '12.345.678-9' };
       mockQuery
         .mockResolvedValueOnce({ rows: [mockShipment] })
@@ -147,9 +204,11 @@ describe('shipping-service', () => {
         .send({ customerCode: 'C123', recipientRut: '12.345.678-9' });
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('ENTREGADO');
+      expect(res.body.customer_code).toBe('C123');
+      expect(res.body.recipient_rut).toBe('12.345.678-9');
     });
 
-    it('cambia stage a CANCELADO', async () => {
+    it('cambia a CANCELADO → body status=CANCELADO', async () => {
       const cancelado = { ...mockShipment, status: 'CANCELADO' };
       mockQuery
         .mockResolvedValueOnce({ rows: [mockShipment] })
@@ -159,13 +218,22 @@ describe('shipping-service', () => {
       expect(res.body.status).toBe('CANCELADO');
     });
 
-    it('rechaza stage inválido', async () => {
+    it('acepta stage en minúsculas (normaliza a uppercase)', async () => {
+      const enReparto = { ...mockShipment, status: 'EN_REPARTO' };
+      mockQuery
+        .mockResolvedValueOnce({ rows: [mockShipment] })
+        .mockResolvedValueOnce({ rows: [enReparto] });
+      const res = await request(app).put('/api/shipments/1/stage?stage=en_reparto');
+      expect(res.status).toBe(200);
+    });
+
+    it('rechaza stage inválido → 400 con mensaje Stage invalido', async () => {
       const res = await request(app).put('/api/shipments/1/stage?stage=INVALIDO');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/Stage invalido/i);
     });
 
-    it('rechaza sin parámetro stage', async () => {
+    it('rechaza sin parámetro stage → 400', async () => {
       const res = await request(app).put('/api/shipments/1/stage');
       expect(res.status).toBe(400);
     });
@@ -175,20 +243,38 @@ describe('shipping-service', () => {
       const res = await request(app).put('/api/shipments/999/stage?stage=EN_REPARTO');
       expect(res.status).toBe(404);
     });
+
+    it('retorna 500 si BD falla al cambiar stage', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [mockShipment] })
+        .mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).put('/api/shipments/1/stage?stage=EN_REPARTO');
+      expect(res.status).toBe(500);
+    });
   });
 
+  // ─── GET /api/shipments/:id/qr ──────────────────────────────────────────────
+
   describe('GET /api/shipments/:id/qr', () => {
-    it('retorna código QR con el tracking del envío', async () => {
+    it('retorna código QR con formato SMARTLOGIX-{tracking_number}', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [mockShipment] });
       const res = await request(app).get('/api/shipments/1/qr');
       expect(res.status).toBe(200);
       expect(res.body.qrCode).toBe('SMARTLOGIX-TRACK-UUID-123');
+      expect(res.body.qrCode).toMatch(/^SMARTLOGIX-TRACK-/);
     });
 
-    it('retorna 404 si el envío no existe', async () => {
+    it('retorna 404 con error si envío no existe', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
       const res = await request(app).get('/api/shipments/999/qr');
       expect(res.status).toBe(404);
+      expect(res.body.error).toBeDefined();
+    });
+
+    it('retorna 500 si BD falla al obtener QR', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('DB crash'));
+      const res = await request(app).get('/api/shipments/1/qr');
+      expect(res.status).toBe(500);
     });
   });
 });

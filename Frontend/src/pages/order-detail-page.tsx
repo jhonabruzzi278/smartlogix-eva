@@ -1,24 +1,27 @@
 ﻿import { useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Box, Check, Clock, History, Package, Trash2, Truck, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Box, Check, Clock, History, Package, Trash2, Truck, X, AlertTriangle } from "lucide-react";
 import { managedUsers } from "@/app/user-directory";
+import { useAuth } from "@/app/auth";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { buildOrderTimeline } from "@/lib/operational-insights";
 import { getOrderHistory } from "@/lib/order-history";
+import { useCustomerScope } from "@/hooks/use-customer-scope";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { ApiNotificationRecord, ApiOrder, ApiShipment } from "@/types/api";
 import type { Order, Shipment } from "@/types/domain";
 
-const STAGES = ["created", "en_preparación", "en_reparto", "entregado"];
+const STAGES = ["created", "en_preparacion", "en_reparto", "entregado"];
 const STAGE_LABELS = ["Recibido", "Preparación", "En reparto", "Entregado"];
 
 export function OrderDetailPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const customerScope = useCustomerScope();
 
   const { data: orders } = useApiQuery<ApiOrder[], Order[]>({
     path: "/api/orders", transform: (r) => r.map((o) => adaptOrder(o))
@@ -59,6 +62,17 @@ export function OrderDetailPage() {
     );
   }
 
+  if (customerScope.isCustomer && customerScope.linkedCustomerId && order.customerId !== customerScope.linkedCustomerId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <Package className="h-12 w-12 text-[#DCE0E2]" />
+        <p className="mt-4 font-medium text-[#6B7280]">Acceso denegado</p>
+        <p className="text-xs text-[#6B7280]">Este pedido no pertenece a tu cuenta.</p>
+        <Link to="/orders" className="mt-2 text-sm text-[#4B98CF] hover:underline">Volver a mis pedidos</Link>
+      </div>
+    );
+  }
+
   const isCancelled = order.stage === "cancelado";
   const stageIdx = STAGES.findIndex((s) => s === order.stage);
   const currentStage = stageIdx >= 0 ? stageIdx : 0;
@@ -71,14 +85,14 @@ export function OrderDetailPage() {
   const badgeClass = () =>
     order.stage === "entregado" ? "bg-green-50 text-green-600" :
     order.stage === "created" ? "bg-[#4B98CF]/10 text-[#4B98CF]" :
-    order.stage === "en_preparación" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
+    order.stage === "en_preparacion" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
     order.stage === "en_reparto" ? "bg-purple-50 text-purple-600" :
     order.stage === "cancelado" ? "bg-red-50 text-red-500" :
     "bg-muted text-muted-foreground";
 
   const badgeLabel = () =>
     order.stage === "created" ? "Pendiente" :
-    order.stage === "en_preparación" ? "Preparación" :
+    order.stage === "en_preparacion" ? "Preparación" :
     order.stage === "en_reparto" ? "En reparto" :
     order.stage === "entregado" ? "Entregado" :
     order.stage === "cancelado" ? "Cancelado" : order.stage;
@@ -126,31 +140,7 @@ export function OrderDetailPage() {
                 <div className="flex flex-col items-center flex-1">
                   <div className={cn("flex h-8 w-8 items-center justify-center rounded-full text-white text-xs", stageColor(i))}>
                     {i < currentStage ? <Check className="h-4 w-4" /> : i === currentStage ? <Clock className="h-4 w-4" /> : <span>{i + 1}</span>}
-      {showDeleteModal && order && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-                <h3 className="font-bold text-sm text-[#112b4a]">Eliminar pedido #{order.id}</h3>
-              </div>
-              <button onClick={() => setShowDeleteModal(false)} className="p-1 rounded hover:bg-gray-100">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <p className="text-sm text-[#6B7280]">
-              Esta accion es irreversible. Se eliminara permanentemente el pedido de <strong>{order.customer}</strong> ({order.sku} x{order.quantity}).
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setShowDeleteModal(false)}>Volver</Button>
-              <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={handleDelete}>
-                Eliminar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+                  </div>
                   <p className={cn("mt-1.5 text-[10px] font-semibold text-center", i <= currentStage ? "text-[#112b4a]" : "text-[#6B7280]")}>{label}</p>
                 </div>
                 {i < 3 && <div className={cn("h-0.5 flex-1 -mt-5", i < currentStage ? "bg-[#4EB4A5]" : "bg-[#ECEEF0]")} />}
@@ -165,6 +155,31 @@ export function OrderDetailPage() {
             <div>
               <p className="text-sm font-bold text-red-600">Pedido cancelado</p>
               {order.cancelReason && <p className="text-xs text-red-500 mt-1">Motivo: {order.cancelReason}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <h3 className="font-bold text-sm text-[#112b4a]">Eliminar pedido #{order.id}</h3>
+              </div>
+              <button onClick={() => setShowDeleteModal(false)} className="p-1 rounded hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-sm text-[#6B7280]">
+              Esta accion es irreversible. Se eliminara permanentemente el pedido de <strong>{order.customer}</strong> ({order.sku} x{order.quantity}).
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowDeleteModal(false)}>Volver</Button>
+              <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={handleDelete}>
+                Eliminar
+              </Button>
             </div>
           </div>
         </div>
@@ -236,28 +251,62 @@ export function OrderDetailPage() {
       </div>
 
       {/* History */}
-      {historyEntries.length > 0 && (
-        <div className="rounded border border-[#DCE0E2] bg-white p-5">
-          <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Historial de acciones</p>
-          <div className="space-y-2">
-            {historyEntries.map((entry) => (
-              <div key={entry.id} className="flex items-start gap-3 rounded bg-[#F8FAFB] px-4 py-2.5">
-                <div className={cn(
-                  "h-2 w-2 rounded-full shrink-0 mt-1.5",
-                  entry.action === "created" && "bg-[#4B98CF]",
-                  entry.action === "confirmed" && "bg-[#4EB4A5]",
-                  entry.action === "cancelled" && "bg-red-500",
-                )} />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-[#112b4a]">{entry.actor} - {entry.action}</p>
-                  {entry.detail && <p className="text-[11px] text-[#6B7280]">{entry.detail}</p>}
-                  <p className="text-[10px] text-[#6B7280]/60">{new Date(entry.timestamp).toLocaleDateString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+      {(() => {
+        const notificationHistory = (notificationRecords ?? []).map((r) => {
+          const record = r as unknown as Record<string, unknown>;
+          return {
+            id: `notif-${record.id ?? 0}`,
+            actor: (record.source_service ?? record.sourceService ?? "Sistema") as string,
+            action: (record.stage ?? "") as string,
+            detail: (record.message ?? "") as string,
+            timestamp: (record.occurred_at ?? record.occurredAt ?? new Date().toISOString()) as string,
+            source: "notification" as const,
+          };
+        });
+        const combined = [...(notificationHistory as Array<{
+          id: string; actor: string; action: string; detail: string; timestamp: string; source: "notification" | "local";
+        }>), ...historyEntries.map((e) => ({
+          id: e.id, actor: `${e.actor} (${e.actorRole})`, action: e.action, detail: e.detail ?? "",
+          timestamp: e.timestamp, source: "local" as const,
+        }))];
+        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        if (combined.length === 0) return null;
+        return (
+          <div className="rounded border border-[#DCE0E2] bg-white p-5">
+            <p className="mb-3 text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">Historial de acciones</p>
+            <div className="space-y-2">
+              {combined.map((entry) => (
+                <div key={entry.id} className="flex items-start gap-3 rounded bg-[#F8FAFB] px-4 py-2.5">
+                  <div className={cn(
+                    "h-2 w-2 rounded-full shrink-0 mt-1.5",
+                    entry.action === "created" && "bg-[#4B98CF]",
+                    entry.action.includes("CREATED") && "bg-[#4B98CF]",
+                    entry.action === "confirmed" && "bg-[#4EB4A5]",
+                    entry.action.includes("CONFIRM") && "bg-[#4EB4A5]",
+                    entry.action === "cancelled" && "bg-red-500",
+                    entry.action.includes("CANCEL") && "bg-red-500",
+                    entry.action.includes("ENTREGADO") && "bg-green-500",
+                    entry.action.includes("DELIVERED") && "bg-green-500",
+                    entry.action.includes("REPARTO") && "bg-purple-500",
+                    entry.action.includes("TRANSIT") && "bg-purple-500",
+                    entry.source === "notification" && !entry.action.includes("ENTREGADO") &&
+                      !entry.action.includes("DELIVERED") && !entry.action.includes("REPARTO") &&
+                      !entry.action.includes("TRANSIT") && !entry.action.includes("CANCEL") &&
+                      !entry.action.includes("CREATED") && !entry.action.includes("CONFIRM") &&
+                      "bg-[#E3AA75]",
+                  )} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#112b4a]">{entry.actor} - {entry.action}</p>
+                    {entry.detail && <p className="text-[11px] text-[#6B7280]">{entry.detail}</p>}
+                    <p className="text-[10px] text-[#6B7280]/60">{new Date(entry.timestamp).toLocaleDateString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -48,6 +48,7 @@ export interface Order {
   timeline: TimelineEvent[];
   assignedTo?: string;
   cancelReason?: string | null;
+  clientCode?: string | null;
 }
 
 export interface Customer {
@@ -57,6 +58,7 @@ export interface Customer {
   address?: string;
   email?: string;
   createdAt: string;
+  rut?: string | null;
 }
 
 export interface Shipment {

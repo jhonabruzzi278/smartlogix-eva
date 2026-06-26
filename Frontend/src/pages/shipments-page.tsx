@@ -1,12 +1,14 @@
 ﻿import { useMemo, useState } from "react";
 import { Check, Clock, Download, Package, Search, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/app/auth";
 import { useApiQuery } from "@/hooks/use-api-query";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
 import { usePermissions } from "@/hooks/use-permissions";
 import { adaptOrder, adaptShipment } from "@/lib/api-adapters";
 import { exportShipmentsCSV } from "@/lib/export-csv";
+import { useCustomerScope } from "@/hooks/use-customer-scope";
 import { cn } from "@/lib/utils";
 import type { ApiOrder, ApiShipment } from "@/types/api";
 import type { Order, Shipment } from "@/types/domain";
@@ -17,7 +19,9 @@ export function ShipmentsPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "cancelado" | "entregado">("all");
   const { can, role } = usePermissions();
+  const { session } = useAuth();
   const canUpdate = can("shipments.update");
+  const customerScope = useCustomerScope();
 
   const { data: shipments, loading: sLoading, refresh: refreshShipments } = useApiQuery<ApiShipment[], Shipment[]>({
     path: "/api/shipments", transform: (r) => r.map(adaptShipment)
@@ -30,8 +34,30 @@ export function ShipmentsPage() {
 
   const { operationalShipments } = useOperationalWorkspace({ orders, shipments });
 
+  // Customer: no linkedCustomerId means unmatched → show empty (not all)
+  const customerOrderIds = useMemo(() => {
+    if (!customerScope.isCustomer) return null;
+    if (!customerScope.linkedCustomerId) return new Set<string>();
+    return new Set(
+      (orders ?? []).filter((o) => o.customerId === customerScope.linkedCustomerId).map((o) => o.id)
+    );
+  }, [customerScope.isCustomer, customerScope.linkedCustomerId, orders]);
+
+  // Shipper: only orders explicitly assigned to this user
+  const shipperOrderIds = useMemo(() => {
+    if (role !== "shipper" || !session?.username) return null;
+    return new Set(
+      (orders ?? []).filter((o) => o.assignedTo === session.username).map((o) => o.id)
+    );
+  }, [role, session?.username, orders]);
+
+  const visibleOrderIds = customerOrderIds ?? shipperOrderIds;
+
   const filtered = useMemo(() => {
     let list = operationalShipments;
+    if (visibleOrderIds !== null) {
+      list = list.filter((s) => visibleOrderIds.has(s.orderId));
+    }
     if (filter === "active") list = list.filter((s) => s.stage !== "entregado" && s.stage !== "cancelado");
     if (filter === "cancelado") list = list.filter((s) => s.stage === "cancelado");
     if (filter === "entregado") list = list.filter((s) => s.stage === "entregado");
@@ -40,14 +66,19 @@ export function ShipmentsPage() {
       list = list.filter((s) => `${s.tracking} ${s.orderId} ${s.carrier}`.toLowerCase().includes(q));
     }
     return list;
-  }, [operationalShipments, filter, query]);
+  }, [operationalShipments, visibleOrderIds, filter, query]);
 
-  const counts = useMemo(() => ({
-    total: operationalShipments.length,
-    active: operationalShipments.filter((s) => s.stage !== "entregado" && s.stage !== "cancelado").length,
-    cancelado: operationalShipments.filter((s) => s.stage === "cancelado").length,
-    entregado: operationalShipments.filter((s) => s.stage === "entregado").length,
-  }), [operationalShipments]);
+  const counts = useMemo(() => {
+    const base = visibleOrderIds !== null
+      ? operationalShipments.filter((s) => visibleOrderIds.has(s.orderId))
+      : operationalShipments;
+    return {
+      total: base.length,
+      active: base.filter((s) => s.stage !== "entregado" && s.stage !== "cancelado").length,
+      cancelado: base.filter((s) => s.stage === "cancelado").length,
+      entregado: base.filter((s) => s.stage === "entregado").length,
+    };
+  }, [operationalShipments, visibleOrderIds]);
 
   function getStepIndex(stage: string) {
     const s = stage.toLowerCase();
@@ -59,12 +90,12 @@ export function ShipmentsPage() {
   const stageColor = (stage: string) =>
     stage === "entregado" ? "bg-[#4EB4A5]/10 text-[#4EB4A5]" :
     stage === "en_reparto" ? "bg-purple-50 text-purple-600" :
-    stage === "en_preparación" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
+    stage === "en_preparacion" ? "bg-[#E3AA75]/10 text-[#E3AA75]" :
     stage === "cancelado" ? "bg-red-50 text-red-500" :
     "bg-[#4B98CF]/10 text-[#4B98CF]";
 
   const stageLabel = (stage: string) =>
-    stage === "en_preparación" ? "Preparación" :
+    stage === "en_preparacion" ? "Preparación" :
     stage === "en_reparto" ? "En reparto" :
     stage === "entregado" ? "Entregado" :
     stage === "cancelado" ? "Cancelado" : stage;
@@ -75,16 +106,22 @@ export function ShipmentsPage() {
         <div>
           <p className="text-[0.6875rem] font-bold uppercase tracking-[1.2px] text-[#6B7280]">Envíos</p>
           <h1 className="text-xl font-bold text-[#112b4a]">
-            {role === "shipper" ? "Mis entregas" : "Seguimiento de despachos"}
+            {role === "shipper" ? "Mis entregas" :
+             customerScope.isCustomer ? "Mis envios" :
+             "Seguimiento de despachos"}
           </h1>
         </div>
         <div className="flex items-center gap-3 text-xs text-[#6B7280]">
           <span>{counts.total} total</span>
           <span className="text-[#4B98CF] font-bold">{counts.active} activos</span>
-          <span className="text-red-500 font-bold">{counts.cancelado} cancelados</span>
-          <button onClick={() => exportShipmentsCSV(operationalShipments.map(s => ({ id: s.id, tracking: s.tracking, orderId: s.orderId, sku: s.sku, stage: String(s.stage), carrier: s.carrier, createdAt: s.createdAt })))} className="flex items-center gap-1 rounded border border-[#DCE0E2] bg-white px-3 py-1.5 text-xs font-semibold text-[#6B7280] hover:text-[#112b4a]">
-            <Download className="h-3.5 w-3.5" />
-          </button>
+          {!customerScope.isCustomer && (
+            <>
+              <span className="text-red-500 font-bold">{counts.cancelado} cancelados</span>
+              <button onClick={() => exportShipmentsCSV(operationalShipments.map(s => ({ id: s.id, tracking: s.tracking, orderId: s.orderId, sku: s.sku, stage: String(s.stage), carrier: s.carrier, createdAt: s.createdAt })))} className="flex items-center gap-1 rounded border border-[#DCE0E2] bg-white px-3 py-1.5 text-xs font-semibold text-[#6B7280] hover:text-[#112b4a]">
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

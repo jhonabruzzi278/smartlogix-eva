@@ -73,16 +73,25 @@ export function buildOperationalAlerts({
     }));
 
   const notificationAlerts: AlertItem[] = (notifications ?? [])
-    .filter((record) => record.targetAudience.toUpperCase() === "OPERATOR" || record.status.toLowerCase().includes("error") || record.status.toLowerCase().includes("warn"))
-    .map((record) => ({
-      id: `notification-${record.id}`,
-      title: `Notificacion ${record.stage}`,
-      description: record.message,
-      type: "notification",
-      severity: record.status.toLowerCase().includes("error") ? "critical" : "high",
-      createdAt: record.occurredAt,
-      actionLabel: "Revisar detalle"
-    }));
+    .filter((record) => {
+      const r = record as unknown as Record<string, unknown>;
+      const audience = String(r.targetAudience ?? r.target_audience ?? "");
+      const status = String(r.status ?? "");
+      return audience.toUpperCase() === "OPERATOR" || status.toLowerCase().includes("error") || status.toLowerCase().includes("warn");
+    })
+    .map((record) => {
+      const r = record as unknown as Record<string, unknown>;
+      const occurredAt = (r.occurredAt ?? r.occurred_at ?? new Date().toISOString()) as string;
+      return {
+        id: `notification-${r.id ?? 0}`,
+        title: `Notificacion ${r.stage ?? ""}`,
+        description: (r.message ?? "") as string,
+        type: "notification" as const,
+        severity: (String(r.status ?? "").toLowerCase().includes("error") ? "critical" : "high") as AlertItem["severity"],
+        createdAt: occurredAt,
+        actionLabel: "Revisar detalle"
+      };
+    });
 
   return sortAlerts([...stockAlerts, ...orderAlerts, ...shipmentAlerts, ...notificationAlerts]);
 }

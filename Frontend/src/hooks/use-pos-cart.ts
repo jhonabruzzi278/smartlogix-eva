@@ -12,7 +12,16 @@ function readCart(): CartEntry[] {
   try {
     const raw = localStorage.getItem(CART_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as CartEntry[];
+    const parsed = JSON.parse(raw) as CartEntry[];
+    return parsed.filter((entry) => {
+      if (!entry?.product?.sku || typeof entry?.product?.price !== "number" || isNaN(entry.product.price)) {
+        return false;
+      }
+      entry.product.price = Math.max(0, entry.product.price);
+      entry.product.stock = Math.max(0, entry.product.stock ?? 0);
+      entry.quantity = Math.max(1, entry.quantity ?? 1);
+      return true;
+    });
   } catch {
     return [];
   }

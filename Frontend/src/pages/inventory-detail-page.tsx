@@ -2,7 +2,7 @@
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Box, Package, ShoppingBag, TrendingDown, TrendingUp } from "lucide-react";
 import { useApiQuery } from "@/hooks/use-api-query";
-import { useOperationalWorkspace } from "@/hooks/use-operational-workspace";
+import { useOperationalWorkspace, type OperationalProduct } from "@/hooks/use-operational-workspace";
 import { adaptInventory, adaptOrder } from "@/lib/api-adapters";
 import { cn } from "@/lib/utils";
 import type { ApiInventory, ApiOrder } from "@/types/api";
@@ -35,9 +35,10 @@ export function InventoryDetailPage() {
 
   const stockPct = Math.min(Math.round((resolvedProduct.stock / 100) * 100), 100);
   const healthColor = resolvedProduct.status === "healthy" ? "#4EB4A5" : resolvedProduct.status === "warning" ? "#E3AA75" : "#CF4B4B";
-  const delta = "stockDelta" in resolvedProduct ? (resolvedProduct as any).stockDelta as number : 0;
-  const reason = "lastAdjustmentReason" in resolvedProduct ? (resolvedProduct as any).lastAdjustmentReason as string : null;
-  const adjustedAt = "lastAdjustmentAt" in resolvedProduct ? (resolvedProduct as any).lastAdjustmentAt as string : null;
+  const opProduct = resolvedProduct as OperationalProduct;
+  const delta = opProduct.stockDelta ?? 0;
+  const reason = opProduct.lastAdjustmentReason ?? null;
+  const adjustedAt = opProduct.lastAdjustmentAt ?? null;
 
   return (
     <div className="space-y-5">
@@ -132,11 +133,11 @@ export function InventoryDetailPage() {
                       "rounded px-2 py-0.5 text-[10px] font-bold",
                       order.stage === "entregado" && "bg-green-50 text-green-600",
                       order.stage === "created" && "bg-[#4B98CF]/10 text-[#4B98CF]",
-                      order.stage === "en_preparación" && "bg-[#E3AA75]/10 text-[#E3AA75]",
+                      order.stage === "en_preparacion" && "bg-[#E3AA75]/10 text-[#E3AA75]",
                       order.stage === "en_reparto" && "bg-purple-50 text-purple-600",
                       order.stage === "cancelado" && "bg-red-50 text-red-500",
                     )}>
-                      {order.stage === "created" ? "Pendiente" : order.stage === "en_preparación" ? "Preparación" : order.stage === "en_reparto" ? "En reparto" : order.stage === "entregado" ? "Entregado" : order.stage === "cancelado" ? "Cancelado" : order.stage}
+                      {order.stage === "created" ? "Pendiente" : order.stage === "en_preparacion" ? "Preparación" : order.stage === "en_reparto" ? "En reparto" : order.stage === "entregado" ? "Entregado" : order.stage === "cancelado" ? "Cancelado" : order.stage}
                     </span>
                     <p className="mt-0.5 text-[10px] text-[#6B7280]">{new Date(order.createdAt).toLocaleDateString("es-CL")}</p>
                   </div>

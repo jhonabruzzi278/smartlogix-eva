@@ -7,20 +7,20 @@
 -- 1. INVENTARIO: 4 productos de tecnología --------------------
 \c inventory_db
 
-INSERT INTO inventory (sku, stock)
-SELECT 'LAPTOP-HP-15', 25
+INSERT INTO inventory (sku, stock, name, price, cost, category)
+SELECT 'LAPTOP-HP-15', 25, 'Laptop HP 15"', 450000, 290000, 'otros'
 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE sku = 'LAPTOP-HP-15');
 
-INSERT INTO inventory (sku, stock)
-SELECT 'MONITOR-DELL-24', 40
+INSERT INTO inventory (sku, stock, name, price, cost, category)
+SELECT 'MONITOR-DELL-24', 40, 'Monitor Dell 24"', 180000, 115000, 'otros'
 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE sku = 'MONITOR-DELL-24');
 
-INSERT INTO inventory (sku, stock)
-SELECT 'TECLADO-LOGI', 60
+INSERT INTO inventory (sku, stock, name, price, cost, category)
+SELECT 'TECLADO-LOGI', 60, 'Teclado Logitech', 25000, 16000, 'otros'
 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE sku = 'TECLADO-LOGI');
 
-INSERT INTO inventory (sku, stock)
-SELECT 'MOUSE-LOGI', 80
+INSERT INTO inventory (sku, stock, name, price, cost, category)
+SELECT 'MOUSE-LOGI', 80, 'Mouse Logitech', 15000, 9500, 'otros'
 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE sku = 'MOUSE-LOGI');
 
 -- 2. CLIENTES -------------------------------------------------
@@ -37,6 +37,10 @@ WHERE NOT EXISTS (SELECT 1 FROM customers WHERE email = 'contacto@andina.cl');
 INSERT INTO customers (name, phone, address, email, created_at)
 SELECT 'Importadora Pacifico', '+56911223344', 'Av. Las Condes 890, Las Condes', 'info@pacifico.cl', NOW()
 WHERE NOT EXISTS (SELECT 1 FROM customers WHERE email = 'info@pacifico.cl');
+
+INSERT INTO customers (name, phone, address, email, created_at)
+SELECT 'Cliente Demo', '+56999888777', 'Calle Demo 123, Santiago', 'cliente@smartlogix.cl', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM customers WHERE email = 'cliente@smartlogix.cl');
 
 -- 3. PEDIDOS: uno en cada estado del flujo --------------------
 
@@ -65,6 +69,16 @@ INSERT INTO orders (id, customer_id, sku, quantity, status, created_at, cancel_r
 SELECT 105, 2, 'TECLADO-LOGI', 1, 'CANCELADO', NOW() - INTERVAL '45 minutes', 'Cliente solicito cancelacion'
 WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 105);
 
+-- Cliente 4 (Cliente Demo): pedido en preparacion para test
+INSERT INTO orders (id, customer_id, sku, quantity, status, created_at)
+SELECT 106, 4, 'MONITOR-DELL-24', 1, 'EN_PREPARACION', NOW() - INTERVAL '15 minutes'
+WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 106);
+
+-- Cliente 4 (Cliente Demo): pedido entregado
+INSERT INTO orders (id, customer_id, sku, quantity, status, created_at, assigned_to)
+SELECT 107, 4, 'MOUSE-LOGI', 2, 'ENTREGADO', NOW() - INTERVAL '2 hours', 'shipper01'
+WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 107);
+
 -- 3. ENVIOS: tracking para pedidos confirmados ----------------
 \c shipping_db
 
@@ -77,6 +91,16 @@ WHERE NOT EXISTS (SELECT 1 FROM shipments WHERE id = 201);
 INSERT INTO shipments (id, order_id, customer_id, sku, quantity, status, tracking_number, created_at, shipped_at, customer_code, recipient_rut)
 SELECT 202, 104, 1, 'MOUSE-LOGI', 10, 'ENTREGADO', 'TRACK-E5F6G7H8', NOW() - INTERVAL '2 hours 55 minutes', NOW() - INTERVAL '2 hours', 'CUST-001', '12345678-9'
 WHERE NOT EXISTS (SELECT 1 FROM shipments WHERE id = 202);
+
+-- Envio del pedido 107 (cliente demo, entregado)
+INSERT INTO shipments (id, order_id, customer_id, sku, quantity, status, tracking_number, created_at, shipped_at, customer_code, recipient_rut)
+SELECT 203, 107, 4, 'MOUSE-LOGI', 2, 'ENTREGADO', 'TRACK-DEMO001', NOW() - INTERVAL '1 hour 55 minutes', NOW() - INTERVAL '1 hour', 'CUST-DEMO', '99888777-7'
+WHERE NOT EXISTS (SELECT 1 FROM shipments WHERE id = 203);
+
+-- Envio en preparacion (para probar boton Retirar)
+INSERT INTO shipments (id, order_id, customer_id, sku, quantity, status, tracking_number, created_at)
+SELECT 204, 106, 4, 'MONITOR-DELL-24', 1, 'EN_PREPARACION', 'TRACK-DEMO002', NOW() - INTERVAL '10 minutes'
+WHERE NOT EXISTS (SELECT 1 FROM shipments WHERE id = 204);
 
 -- 4. NOTIFICACIONES: trazabilidad de eventos ------------------
 \c notification_db
@@ -105,6 +129,15 @@ WHERE NOT EXISTS (SELECT 1 FROM notification_records WHERE id = 304);
 INSERT INTO notification_records (id, event_id, order_id, customer_id, stage, status, message, target_audience, source_service, occurred_at, received_at)
 SELECT 305, 'seed-105-cancelled', 105, 2, 'Pedido', 'CANCELADO', 'Pedido #105 cancelado: Cliente solicito cancelacion', 'OPERATOR', 'orders-service', NOW() - INTERVAL '45 minutes', NOW() - INTERVAL '45 minutes'
 WHERE NOT EXISTS (SELECT 1 FROM notification_records WHERE id = 305);
+
+-- Pedido 106 (demo) creado y en preparacion
+INSERT INTO notification_records (id, event_id, order_id, customer_id, stage, status, message, target_audience, source_service, occurred_at, received_at)
+SELECT 306, 'seed-106-created', 106, 4, 'Pedido', 'CREADO', 'Pedido #106 registrado: 1x MONITOR-DELL-24', 'OPERATOR', 'orders-service', NOW() - INTERVAL '15 minutes', NOW() - INTERVAL '15 minutes'
+WHERE NOT EXISTS (SELECT 1 FROM notification_records WHERE id = 306);
+
+INSERT INTO notification_records (id, event_id, order_id, customer_id, stage, status, message, target_audience, source_service, occurred_at, received_at)
+SELECT 307, 'seed-106-shipment', 106, 4, 'Envio', 'EN_PREPARACION', 'Envio creado tracking TRACK-DEMO002. Listo para retiro en tienda.', 'CLIENT', 'shipping-service', NOW() - INTERVAL '10 minutes', NOW() - INTERVAL '10 minutes'
+WHERE NOT EXISTS (SELECT 1 FROM notification_records WHERE id = 307);
 
 -- ============================================================
 -- Resumen de datos sembrados
