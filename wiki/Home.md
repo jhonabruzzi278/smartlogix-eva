@@ -1,0 +1,45 @@
+# SmartLogix — Wiki
+
+Plataforma de gestión logística basada en microservicios. Proyecto académico Evaluación 2.
+
+---
+
+## Índice
+
+| Página | Descripción |
+|--------|-------------|
+| [[Arquitectura]] | Diagrama de servicios, puertos, tecnologías |
+| [[Inicio-Rapido]] | Levantar el proyecto en 3 pasos |
+| [[Roles-y-RBAC]] | Los 7 roles, rutas y permisos |
+| [[Codigo-de-Cliente]] | Qué es SL-XXXXXX y cómo funciona |
+| [[Flujo-de-Negocio]] | Ciclo completo de un pedido paso a paso |
+| [[API-Reference]] | Todos los endpoints del sistema |
+| [[Seguridad-y-RLS]] | JWT, RLS, validación de entrega |
+| [[Frontend]] | Páginas, hooks, PWA |
+| [[Pruebas]] | Tests unitarios y cobertura |
+
+---
+
+## Resumen del sistema
+
+**SmartLogix** permite gestionar el ciclo completo de una operación logística:
+
+```
+Cliente crea pedido → Bodega confirma stock → Transportista entrega →
+Cliente verifica su pedido con código SL-XXXXXX
+```
+
+### Stack principal
+
+| Capa | Tecnología |
+|------|-----------|
+| Frontend | React 18 + TypeScript + Vite 6 + Tailwind |
+| API Gateway | Nginx Alpine (puerto 8080) |
+| Microservicios | Node.js 22 + Express 4 |
+| Base de datos | PostgreSQL 15 (4 bases independientes) |
+| Infraestructura | Docker + Docker Compose |
+
+### Repositorio
+
+- **GitHub:** https://github.com/jhonabruzzi278/smartlogix-eva
+- **Frontend (Vercel):** https://smartlogix-five.vercel.app
