@@ -36,6 +36,12 @@ services:
       - SHIPPING_SERVICE_URL=http://shipping-service:8084
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
       - PORT=8081
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - APP_URL=${APP_URL}
     ports:
       - "8081:8081"
     depends_on:
@@ -73,6 +79,12 @@ services:
       - NOTIFICATION_SERVICE_URL=http://notification-service:8085
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
       - PORT=8084
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - APP_URL=${APP_URL}
     ports:
       - "8084:8084"
     depends_on:

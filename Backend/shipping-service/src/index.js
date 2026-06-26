@@ -1,6 +1,6 @@
 ﻿const { createApp } = require('../shared/app');
 const { validateShipmentBody, validateShipmentStage } = require('../shared/validate');
-const { sendEmail, buildOrderConfirmationEmail, buildShipmentUpdateEmail } = require('../shared/email');
+const { sendEmail, buildShipmentUpdateEmail } = require('../shared/email');
 const log = require('../shared/logger');
 
 const { app, pool, sendError, start } = createApp('shipping_db', process.env.PORT || 8084);
@@ -65,6 +65,22 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
       notifStage = 'SHIPMENT_IN_TRANSIT'; notifMsg = `Envío en reparto - ${updated.tracking_number}`;
       try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=EN_REPARTO`, { method: 'PUT' }); }
       catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
+      if (shipment.customer_id && shipment.customer_id > 0) {
+        try {
+          const [orderRes, custRes] = await Promise.all([
+            fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}`),
+            fetch(`${ORDERS_URL}/api/customers/${shipment.customer_id}`)
+          ]);
+          const [orderData, custData] = await Promise.all([orderRes.json(), custRes.json()]);
+          if (custData && custData.email) {
+            const { subject, html } = buildShipmentUpdateEmail({
+              customerName: custData.name, orderId: shipment.order_id,
+              clientCode: orderData.client_code, trackingCode: updated.tracking_number, stage
+            });
+            sendEmail({ to: custData.email, subject, html }).catch(() => {});
+          }
+        } catch (e) { log.warn('Email EN_REPARTO failed', { orderId: shipment.order_id, message: e.message }); }
+      }
     } else if (stage === 'ENTREGADO') {
       const p = req.body || {};
       const normalizeRut = (r) => (r || '').replace(/[.\-\s]/g, '').toUpperCase();
@@ -103,6 +119,13 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
       notifStage = 'SHIPMENT_DELIVERED'; notifMsg = `Envío entregado - ${updated.tracking_number}`;
       try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=ENTREGADO`, { method: 'PUT' }); }
       catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
+      if (customerData && customerData.email) {
+        const { subject, html } = buildShipmentUpdateEmail({
+          customerName: customerData.name, orderId: shipment.order_id,
+          clientCode: orderData && orderData.client_code, trackingCode: updated.tracking_number, stage
+        });
+        sendEmail({ to: customerData.email, subject, html }).catch(e => log.warn('Email ENTREGADO failed', { orderId: shipment.order_id, message: e.message }));
+      }
     } else {
       updated = (await pool.query('UPDATE shipments SET status=$1 WHERE id=$2 RETURNING *', [stage, req.params.id])).rows[0];
       notifStage = 'SHIPMENT_CANCELLED'; notifMsg = `Envío cancelado - ${updated.tracking_number}`;

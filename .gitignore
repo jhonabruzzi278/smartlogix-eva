@@ -9,6 +9,10 @@ Backend/**/.mvn/
 Frontend/dist/
 Frontend/dev-dist/
 
+# Coverage
+coverage/
+Backend/**/coverage/
+
 # Environment
 .env
 .env.local
@@ -37,6 +41,12 @@ Thumbs.db
 
 # Docker
 Backend/postgres_data/
+
+# Tooling (AI agents / skills cache)
+.agents/
+.claude/
+.kiro/
+skills-lock.json
 
 # Binary files (Word docs en raiz)
 *.docx

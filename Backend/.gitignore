@@ -7,6 +7,9 @@ node_modules/
 *.env
 .env.*
 
+# Coverage
+**/coverage/
+
 # Logs
 *.log
 
@@ -22,3 +25,9 @@ Thumbs.db
 
 # Docker
 **/data/
+
+# Tooling
+.agents/
+.claude/
+.kiro/
+skills-lock.json

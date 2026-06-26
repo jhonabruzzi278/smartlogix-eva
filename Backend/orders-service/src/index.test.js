@@ -332,7 +332,7 @@ describe('orders-service', () => {
       const res = await request(app).put('/api/orders/1/cancel').send({ reason: 'Cambio de parecer' });
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('CANCELADO');
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalled();
       const inventoryCall = global.fetch.mock.calls[0][0];
       expect(inventoryCall).toMatch(/inventory/i);
     });

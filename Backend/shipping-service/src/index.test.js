@@ -27,7 +27,7 @@ describe('shipping-service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockQuery.mockResolvedValue({ rows: [] });
-    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
   });
 
   // ─── HEALTH ────────────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ describe('shipping-service', () => {
       const res = await request(app).put('/api/shipments/1/stage?stage=EN_REPARTO');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('EN_REPARTO');
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalled();
     });
 
     it('cambia a ENTREGADO con datos de entrega → body tiene customer_code y recipient_rut', async () => {

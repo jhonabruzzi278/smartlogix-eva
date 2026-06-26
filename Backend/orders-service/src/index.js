@@ -113,8 +113,7 @@ app.post('/api/orders', async (req, res) => {
         orderId: order.id,
         sku: order.sku,
         quantity: order.quantity,
-        customerCode,
-        trackingCode: null
+        customerCode
       });
       sendEmail({ to: customer.email, subject, html }).catch(() => {});
     }
