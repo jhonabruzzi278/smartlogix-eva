@@ -1,106 +1,141 @@
 # orders-service
 
-Microservicio de gestion de pedidos. Node.js 22 + Express 4 + PostgreSQL.
+Microservicio de gestión de pedidos y clientes. Node.js 22 + Express 4 + PostgreSQL.
+
+---
 
 ## Responsabilidad
 
-Gestiona el ciclo de vida completo de los pedidos: creacion, confirmacion (orquestacion), cancelacion, asignacion de transportista y eliminacion.
+- Ciclo de vida completo de pedidos: creación, confirmación (orquestador Saga), cancelación, asignación y eliminación
+- CRUD de clientes (con RUT)
+- Generación del código de cliente `SL-XXXXXX` al crear una orden
+- **RLS por rol**: elimina `client_code` del response para los roles `shipper`, `customer` y `vendor`
+- Endpoint de tracking público (`/track/:clientCode`) sin autenticación
+
+---
 
 ## Puerto
 
 `8081` | Base de datos: `orders_db`
 
+---
+
 ## Dependencias
 
-- express, pg, helmet, cors, express-rate-limit, uuid
-- shared/ (app, db, logger, validate, security, shutdown)
+- express, pg, helmet, cors, express-rate-limit, nodemailer
+- shared/ (app, db, logger, validate, security, email)
 
-## Endpoints
+---
 
-| Metodo | Ruta | Descripcion |
+## Endpoints — Órdenes
+
+| Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | /api/orders/test | Health check |
-| POST | /api/orders | Crear pedido `{customerId, sku, quantity}` |
-| GET | /api/orders | Listar todos los pedidos |
-| PUT | /api/orders/:id/confirm | Confirmar: descuenta stock + crea envio |
-| PUT | /api/orders/:id/cancel | Cancelar `{reason}`. Restaura stock si estaba en preparacion |
-| PUT | /api/orders/:id/status?status=X | Cambiar estado manualmente |
-| PUT | /api/orders/:id/assign?transporter=X | Asignar transportista |
-| DELETE | /api/orders/:id | Eliminar pedido |
-| GET | /api/customers | Listar clientes |
+| GET | `/api/orders/test` | Health check |
+| GET | `/api/orders/track/:clientCode` | **Tracking público** — solo campos seguros (sin email/teléfono) |
+| GET | `/api/orders/report` | Reporte JOIN orders+customers (stored procedure) |
+| GET | `/api/orders` | Listar órdenes (`client_code` omitido para shipper/customer/vendor) |
+| GET | `/api/orders/:id` | Detalle de orden (RLS aplicada) |
+| POST | `/api/orders` | Crear orden `{customerId, sku, quantity}` → devuelve `customerCode` |
+| PUT | `/api/orders/:id/confirm` | Confirmar: descuenta stock + crea envío + `EN_PREPARACION` |
+| PUT | `/api/orders/:id/cancel` | Cancelar `{reason}` — restaura stock si aplica |
+| PUT | `/api/orders/:id/status?status=X` | Cambiar estado manualmente |
+| PUT | `/api/orders/:id/assign?transporter=X` | Asignar transportista |
+| DELETE | `/api/orders/:id` | Eliminar orden |
 
-## Estados
+## Endpoints — Clientes
 
-- `CREATED` - Pedido creado, pendiente de confirmacion
-- `EN_PREPARACION` - Confirmado, stock descontado, envio generado
-- `EN_REPARTO` - En camino al cliente
-- `ENTREGADO` - Entregado exitosamente
-- `CANCELADO` - Cancelado (con motivo)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/customers` | Listar clientes |
+| GET | `/api/customers/:id` | Detalle de cliente |
+| POST | `/api/customers` | Crear cliente `{name, phone, address, email, rut}` |
+| PUT | `/api/customers/:id` | Actualizar cliente (incluyendo RUT) |
+| DELETE | `/api/customers/:id` | Eliminar cliente |
 
-## Comunicacion con otros servicios
+---
 
-Al confirmar un pedido (`PUT /confirm`), este servicio orquesta:
+## Estados de orden
 
-1. `POST /api/inventory/:sku/adjust?delta=-N` (inventory-service) - Descuenta stock
-2. `POST /api/shipments` (shipping-service) - Crea el envio
-3. Actualiza estado a `EN_PREPARACION`
+| Estado | Descripción |
+|--------|-------------|
+| `CREATED` | Pendiente de confirmación |
+| `EN_PREPARACION` | Confirmado — stock descontado, envío generado |
+| `EN_REPARTO` | En camino al cliente |
+| `ENTREGADO` | Entregado exitosamente |
+| `CANCELADO` | Cancelado (incluye motivo) |
 
-Al cancelar un pedido en preparacion, restaura el stock:
-1. `POST /api/inventory/:sku/adjust?delta=+N` (inventory-service) - Restaura stock
+---
 
-## Ejecucion
+## Código de cliente (SL-XXXXXX)
 
-### Con Docker (recomendado)
+Al crear una orden, el servicio genera automáticamente un código único con formato `SL-XXXXXX` (prefijo fijo + 6 caracteres alfanuméricos en mayúscula). Este código:
 
-```bash
-# Desde la raiz del proyecto
-docker compose -f docker-compose.node.yml up -d --build
+- Se incluye en el email de confirmación enviado al cliente
+- Es el único identificador que el cliente necesita para rastrear su pedido
+- **Nunca se devuelve** en los endpoints de listado/detalle cuando el rol es `shipper`, `customer` o `vendor`
+- El transportista **nunca lo ve** — debe pedírselo al cliente en persona para confirmar la entrega
+
+---
+
+## Row-Level Security (RLS)
+
+El servicio extrae el rol del JWT en cada request (claim `cognito:groups[0]`):
+
+```
+RESTRICTED_ROLES = ['shipper', 'customer', 'vendor']
 ```
 
-### Sin Docker (desarrollo)
+- `GET /api/orders` y `GET /api/orders/:id`: eliminan `client_code` del response para roles restringidos
+- `GET /api/orders/track/:clientCode`: endpoint público — devuelve solo `id`, `sku`, `quantity`, `status`, `created_at`, `client_code`, `cancel_reason`, `customer_name` (sin email ni teléfono)
 
-```bash
-cd Backend/orders-service
-npm install
-DB_URL=postgresql://postgres:postgres@localhost:5432/orders_db node src/index.js
+---
+
+## Saga de confirmación
+
 ```
+PUT /api/orders/:id/confirm
+  │
+  ├─► POST inventory-service /api/inventory/:sku/adjust?delta=-N
+  │     └── Descuenta stock
+  │
+  ├─► POST shipping-service /api/shipments
+  │     └── Crea envío (TRACK-XXXXXXXX) + notifica notification-service
+  │
+  └─► UPDATE orders SET status='EN_PREPARACION'
+```
+
+Al cancelar una orden `EN_PREPARACION` o `EN_REPARTO`:
+1. Restaura stock: `adjust?delta=+N`
+2. Cancela el envío: `PUT /api/shipments/:id/stage?stage=CANCELADO`
+
+---
+
+## Stored Procedures
+
+| Función | Descripción |
+|---------|-------------|
+| `fn_get_orders_with_customer(p_status)` | Reporte con datos de cliente JOIN |
+| `fn_cancel_order(p_order_id, p_reason)` | Cancelación atómica de orden |
+
+---
 
 ## Variables de entorno
 
-| Variable | Default | Descripcion |
+| Variable | Default | Descripción |
 |----------|---------|-------------|
-| PORT | 8081 | Puerto HTTP |
-| DB_URL | postgresql://postgres:postgres@postgres-db:5432/orders_db | Conexion BD |
-| INVENTORY_SERVICE_URL | http://inventory-service:8082 | URL del servicio de inventario |
-| SHIPPING_SERVICE_URL | http://shipping-service:8084 | URL del servicio de envios |
-| ALLOWED_ORIGINS | * | CORS origins |
+| `PORT` | 8081 | Puerto HTTP |
+| `DATABASE_URL` | `postgresql://postgres:postgres@postgres-db:5432/orders_db` | Conexión BD |
+| `INVENTORY_SERVICE_URL` | `http://inventory-service:8082` | URL inventory-service |
+| `SHIPPING_SERVICE_URL` | `http://shipping-service:8084` | URL shipping-service |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | — | Configuración correo |
 
-## Pruebas Unitarias
+---
 
-### Ejecutar pruebas
+## Pruebas
 
 ```bash
+cd Backend/orders-service
 npm test
+npm test -- --coverage   # Reporte en coverage/index.html
 ```
-
-### Ejecutar con cobertura (genera reporte HTML)
-
-```bash
-npm test -- --coverage
-# Reporte generado en: coverage/index.html
-```
-
-### Ver reporte de cobertura
-
-Abrir `coverage/index.html` en el navegador.
-
-### Cobertura actual
-
-| M�trica    | Porcentaje |
-|------------|-----------|
-| Statements | ver coverage/index.html |
-| Branches   | ver coverage/index.html |
-| Functions  | ver coverage/index.html |
-| Lines      | ver coverage/index.html |
-
-Umbral m�nimo configurado: **60%** en todas las m�tricas.

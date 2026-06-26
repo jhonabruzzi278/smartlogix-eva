@@ -1,6 +1,6 @@
-# SmartLogix - Plataforma de Gestion Logistica
+# SmartLogix — Plataforma de Gestión Logística
 
-**Repositorio:** https://github.com/jhonabruzzi278/smartlogix-eva
+**Repositorio:** https://github.com/jhonabruzzi278/smartlogix-eva  
 **Frontend (Vercel):** https://smartlogix-five.vercel.app
 
 ---
@@ -8,36 +8,43 @@
 ## Arquitectura
 
 ```
-+----------------------------------------------+
-| Frontend (React + Vite)    localhost:3000     |
-+----------------------------------------------+
-| API Gateway / BFF (Nginx)  localhost:8080     |
-+----------+-----------+-----------+-----------+
-| orders   | inventory | shipping  | notif.    |
-| Node.js  | Node.js   | Node.js   | Node.js   |
-| :8081    | :8082     | :8084     | :8085     |
-+----------+-----------+-----------+-----------+
-| PostgreSQL 15 (4 bases independientes) :5432  |
-+----------------------------------------------+
+┌─────────────────────────────────────────────────────┐
+│  Frontend  React 18 + TypeScript + Vite   :3000     │
+└──────────────────────┬──────────────────────────────┘
+                       │ /api/*  (proxy Vite)
+┌──────────────────────▼──────────────────────────────┐
+│  API Gateway / BFF   Nginx Alpine          :8080     │
+└──────┬───────────┬──────────────┬───────────────────┘
+       │           │              │
+┌──────▼──┐  ┌────▼────┐  ┌──────▼──┐  ┌──────────────┐
+│ orders  │  │inventory│  │shipping │  │notification  │
+│ :8081   │  │ :8082   │  │ :8084   │  │   :8085      │
+└──────┬──┘  └────┬────┘  └──────┬──┘  └──────────────┘
+       │           │              │
+┌──────▼───────────▼──────────────▼────────────────────┐
+│          PostgreSQL 15  (4 bases independientes)      │
+│  orders_db  inventory_db  shipping_db  notification_db│
+└───────────────────────────────────────────────────────┘
 ```
 
-**Flujo de negocio:** orders --REST--> inventory + shipping --REST--> notification
+**Flujo Saga:** `POST /orders/confirm` → descuenta stock (inventory) → crea envío (shipping) → genera notificación (notification)
 
 ---
 
-## Stack tecnologico
+## Stack tecnológico
 
-| Capa | Tecnologia |
+| Capa | Tecnología |
 |------|-----------|
 | Frontend | React 18, TypeScript 5.7, Vite 6, Tailwind CSS, shadcn/ui, PWA |
-| BFF | Nginx Alpine (reverse proxy, port 8080) |
+| BFF | Nginx Alpine (reverse proxy, puerto 8080) |
 | Microservicios | Node.js 22, Express 4, pg (PostgreSQL driver) |
 | Base de datos | PostgreSQL 15 Alpine, 1 DB por servicio |
 | Infraestructura | Docker Desktop, Docker Compose |
+| Auth | JWT (Cognito / modo demo local) |
 
 ---
 
-## Inicio rapido (Docker Desktop)
+## Inicio rápido
 
 ### Requisitos
 
@@ -47,31 +54,26 @@
 ### 1. Levantar el backend completo
 
 ```bash
-# Desde la raiz del proyecto
+# Desde la raíz del proyecto
 docker compose up -d --build
 
-# Verificar que todos los contenedores esten corriendo
+# Verificar contenedores
 docker compose ps
 ```
 
-Los contenedores que se levantan:
-
-| Contenedor | Puerto local | Descripcion |
+| Contenedor | Puerto local | Descripción |
 |-----------|-------------|-------------|
 | smartlogix-db | 5432 | PostgreSQL (4 DBs) |
 | smartlogix-orders | 8081 | orders-service |
 | smartlogix-inventory | 8082 | inventory-service |
 | smartlogix-shipping | 8084 | shipping-service |
 | smartlogix-notification | 8085 | notification-service |
-| smartlogix-api-gateway | **8080** | Nginx BFF (punto unico de entrada) |
+| smartlogix-api-gateway | **8080** | Nginx BFF (punto único de entrada) |
 
-### 2. Verificar que el backend este activo
+### 2. Verificar el backend
 
 ```bash
-# Health check del BFF
 curl http://localhost:8080/healthz
-
-# Test del orders-service
 curl http://localhost:8080/api/orders/test
 ```
 
@@ -84,17 +86,163 @@ npm run dev
 # Abre http://localhost:3000
 ```
 
-El proxy de Vite redirige automaticamente `/api/*` a `http://localhost:8080`.
+El proxy de Vite redirige automáticamente `/api/*` a `http://localhost:8080`.
 
 ---
 
-## Comandos Docker utiles
+## Roles y acceso (RBAC)
+
+El sistema tiene 7 roles con rutas y permisos diferenciados. Cada usuario solo ve y opera lo que corresponde a su rol.
+
+| Rol | Ruta por defecto | Qué puede hacer |
+|-----|-----------------|-----------------|
+| `owner` | `/dashboard` | Control total: órdenes, inventario, envíos, usuarios, reportes |
+| `ops` | `/orders` | Crea y gestiona pedidos, coordina despacho |
+| `warehouse` | `/inventory` | Controla stock, confirma disponibilidad |
+| `shipper` | `/deliveries` | Gestiona sus entregas asignadas, confirma con código + RUT |
+| `vendor` | `/pos` | Registra ventas en caja, consulta stock |
+| `support` | `/alerts` | Monitorea operación, revisa trazabilidad |
+| `customer` | `/tracking` | Consulta su pedido con código `SL-XXXXXX` |
+
+### Usuarios de prueba (modo demo)
+
+| Usuario | Contraseña | Rol |
+|---------|-----------|-----|
+| `admin` | `Demo1234!` | owner |
+| `ops1` | `Demo1234!` | ops |
+| `bodega1` | `Demo1234!` | warehouse |
+| `transportista1` | `Demo1234!` | shipper |
+| `vendedor1` | `Demo1234!` | vendor |
+| `soporte1` | `Demo1234!` | support |
+| `cliente1` | `Demo1234!` | customer |
+
+---
+
+## Endpoints API (vía BFF :8080)
+
+### Orders
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/orders/test` | Health check |
+| GET | `/api/orders/track/:clientCode` | Tracking público por código `SL-XXXXXX` |
+| GET | `/api/orders` | Listar órdenes (strip `client_code` para shipper/customer/vendor) |
+| GET | `/api/orders/:id` | Detalle de orden |
+| GET | `/api/orders/report` | Reporte con datos de cliente (stored procedure) |
+| POST | `/api/orders` | Crear orden `{customerId, sku, quantity}` → genera `SL-XXXXXX` |
+| PUT | `/api/orders/:id/confirm` | Confirmar (Saga: stock + envío + notificación) |
+| PUT | `/api/orders/:id/cancel` | Cancelar `{reason}` (restaura stock si EN_PREPARACION) |
+| PUT | `/api/orders/:id/status?status=X` | Cambiar estado |
+| PUT | `/api/orders/:id/assign?transporter=X` | Asignar transportista |
+| DELETE | `/api/orders/:id` | Eliminar orden |
+
+### Customers (mismo servicio que orders)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/customers` | Listar clientes |
+| GET | `/api/customers/:id` | Detalle de cliente |
+| POST | `/api/customers` | Crear cliente `{name, phone, address, email, rut}` |
+| PUT | `/api/customers/:id` | Actualizar cliente (incluyendo RUT) |
+| DELETE | `/api/customers/:id` | Eliminar cliente |
+
+### Inventory
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/inventory` | Listar productos |
+| GET | `/api/inventory/report` | Reporte clasificado por nivel de stock (SP) |
+| GET | `/api/inventory/:sku` | Consultar SKU |
+| POST | `/api/inventory` | Agregar producto `{sku, stock}` |
+| PUT | `/api/inventory/:sku` | Actualizar stock `{stock}` |
+| DELETE | `/api/inventory/:sku` | Eliminar producto |
+| POST | `/api/inventory/:sku/adjust?delta=N` | Ajustar stock (SP) |
+| GET | `/api/sales` | Listar ventas |
+| POST | `/api/sales` | Registrar venta `{sku, quantity}` |
+
+### Shipping
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/shipments` | Listar envíos |
+| GET | `/api/shipments/:orderId` | Envío por ID de orden |
+| POST | `/api/shipments` | Crear envío + número TRACK-XXXXXXXX |
+| PUT | `/api/shipments/:id/stage?stage=X` | Cambiar etapa |
+| GET | `/api/shipments/:id/qr` | Código QR del envío |
+
+Al marcar `ENTREGADO`, se valida:
+- `customerCode` debe coincidir con `orders.client_code`
+- `recipientRut` debe coincidir con `customers.rut`
+
+### Notifications
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/notifications` | Persistir evento |
+| GET | `/api/notifications/order/:id` | Trazabilidad de orden |
+| GET | `/api/notifications/audience/:aud` | Por audiencia |
+
+---
+
+## Flujo de negocio completo
+
+```bash
+# 1. Crear cliente con RUT
+curl -X POST http://localhost:8080/api/customers \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Juan Perez","phone":"+56912345678","email":"juan@mail.cl","rut":"12.345.678-9"}'
+
+# 2. Agregar producto al inventario
+curl -X POST http://localhost:8080/api/inventory \
+  -H "Content-Type: application/json" \
+  -d '{"sku":"COCA-2L","stock":100}'
+
+# 3. Crear orden → respuesta incluye customerCode (SL-XXXXXX)
+curl -X POST http://localhost:8080/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":1,"sku":"COCA-2L","quantity":3}'
+# → {"customerCode": "SL-AB12CD", ...}
+
+# 4. Confirmar orden (descuenta stock + crea envío TRACK-XXXXXXXX)
+curl -X PUT http://localhost:8080/api/orders/1/confirm
+
+# 5. Asignar transportista
+curl -X PUT "http://localhost:8080/api/orders/1/assign?transporter=transportista1"
+
+# 6. Avanzar etapas del envío
+curl -X PUT "http://localhost:8080/api/shipments/1/stage?stage=EN_REPARTO"
+
+# 7. Confirmar entrega (valida código + RUT)
+curl -X PUT "http://localhost:8080/api/shipments/1/stage?stage=ENTREGADO" \
+  -H "Content-Type: application/json" \
+  -d '{"customerCode":"SL-AB12CD","recipientRut":"12.345.678-9","proofOfDeliveryImage":"data:image/..."}'
+
+# 8. El cliente consulta su pedido (endpoint público, sin auth)
+curl http://localhost:8080/api/orders/track/SL-AB12CD
+
+# 9. Ver trazabilidad completa
+curl http://localhost:8080/api/notifications/order/1
+```
+
+---
+
+## Seguridad y RLS
+
+- **JWT role-based:** El orders-service extrae el rol del claim `cognito:groups` del JWT en cada request.
+- **Column-level stripping:** `client_code` se elimina del response para los roles `shipper`, `customer` y `vendor`.
+- **Tracking público:** El endpoint `/api/orders/track/:clientCode` devuelve solo campos seguros (sin email ni teléfono del cliente).
+- **Validación de entrega:** El shipping-service cruza el código del cliente y el RUT del receptor contra la BD antes de marcar como ENTREGADO.
+- **Scope de vistas:** Cada página filtra por rol en frontend (defensa en profundidad).
+
+---
+
+## Comandos Docker útiles
 
 ```bash
 # Ver logs en tiempo real
 docker compose logs -f
 
-# Ver logs de un servicio especifico
+# Logs de un servicio específico
 docker compose logs -f orders-service
 
 # Detener todos los contenedores
@@ -103,128 +251,24 @@ docker compose down
 # Detener y eliminar volumen (borra datos BD)
 docker compose down -v
 
-# Reconstruir un servicio especifico
+# Reconstruir un servicio específico
 docker compose up -d --build orders-service
 ```
 
 ---
 
-## Puertos expuestos
-
-| Servicio | Puerto | Uso |
-|---------|--------|-----|
-| Nginx BFF | 8080 | API Gateway - usar para Postman y frontend |
-| orders-service | 8081 | Acceso directo (debug) |
-| inventory-service | 8082 | Acceso directo (debug) |
-| shipping-service | 8084 | Acceso directo (debug) |
-| notification-service | 8085 | Acceso directo (debug) |
-| PostgreSQL | 5432 | Conexion directa a BD (TablePlus, pgAdmin) |
-
-**Usar siempre el BFF (8080)** para requests normales. Los puertos directos son para debug.
-
----
-
-## Endpoints API (via BFF :8080)
-
-### Orders
-
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| GET | /healthz | Health check del BFF |
-| GET | /api/orders/test | Test del orders-service |
-| POST | /api/orders | Crear orden `{customerId, sku, quantity}` |
-| GET | /api/orders | Listar todas las ordenes |
-| GET | /api/orders/report | Reporte con datos de cliente (SP) |
-| PUT | /api/orders/:id/confirm | Confirmar (Saga: stock + envio) |
-| PUT | /api/orders/:id/cancel | Cancelar `{reason}` |
-| PUT | /api/orders/:id/status?status=X | Cambiar estado |
-| PUT | /api/orders/:id/assign?transporter=X | Asignar transportista |
-| DELETE | /api/orders/:id | Eliminar orden |
-| GET | /api/customers | Listar clientes |
-| POST | /api/customers | Crear cliente |
-| PUT | /api/customers/:id | Actualizar cliente |
-| DELETE | /api/customers/:id | Eliminar cliente |
-
-### Inventory
-
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| GET | /api/inventory | Listar productos |
-| GET | /api/inventory/report | Reporte clasificado por nivel stock (SP) |
-| GET | /api/inventory/:sku | Consultar SKU |
-| POST | /api/inventory | Agregar producto `{sku, stock}` |
-| PUT | /api/inventory/:sku | Actualizar stock `{stock}` |
-| DELETE | /api/inventory/:sku | Eliminar producto |
-| POST | /api/inventory/:sku/adjust?delta=N | Ajustar stock (SP) |
-| GET | /api/sales | Listar ventas |
-| POST | /api/sales | Registrar venta `{sku, quantity}` |
-
-### Shipping
-
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| GET | /api/shipments | Listar envios |
-| GET | /api/shipments/:orderId | Envio por orden |
-| POST | /api/shipments | Crear envio + tracking |
-| PUT | /api/shipments/:id/stage?stage=X | Cambiar etapa |
-| GET | /api/shipments/:id/qr | Codigo QR |
-
-### Notifications
-
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| POST | /api/notifications | Persistir evento |
-| GET | /api/notifications/order/:id | Trazabilidad de orden |
-| GET | /api/notifications/audience/:aud | Por audiencia |
-
----
-
-## Flujo de negocio completo (ejemplo)
+## Pruebas
 
 ```bash
-# 1. Crear cliente
-curl -X POST http://localhost:8080/api/customers \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Juan Perez","phone":"999888777","address":"Av. Lima 123"}'
-
-# 2. Agregar producto al inventario
-curl -X POST http://localhost:8080/api/inventory \
-  -H "Content-Type: application/json" \
-  -d '{"sku":"COCA-2L","stock":100}'
-
-# 3. Crear orden
-curl -X POST http://localhost:8080/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{"customerId":1,"sku":"COCA-2L","quantity":3}'
-
-# 4. Confirmar orden (descuenta stock + crea envio + notifica)
-curl -X PUT http://localhost:8080/api/orders/1/confirm
-
-# 5. Avanzar etapa del envio
-curl -X PUT "http://localhost:8080/api/shipments/1/stage?stage=EN_REPARTO"
-curl -X PUT "http://localhost:8080/api/shipments/1/stage?stage=ENTREGADO"
-
-# 6. Ver trazabilidad completa
-curl http://localhost:8080/api/notifications/order/1
-
-# 7. Ver reporte de ordenes
-curl http://localhost:8080/api/orders/report
-```
-
----
-
-## Pruebas unitarias
-
-```bash
-# Frontend (desde carpeta Frontend/)
-npm test
-npm run test:coverage   # Genera reporte en Frontend/coverage/index.html
-
-# Backend (desde carpeta de cada microservicio)
+# Backend — cada microservicio
 cd Backend/orders-service && npm test -- --coverage
 cd Backend/inventory-service && npm test -- --coverage
 cd Backend/shipping-service && npm test -- --coverage
 cd Backend/notification-service && npm test -- --coverage
+
+# Frontend
+cd Frontend && npm test
+npm run test:coverage   # Reporte en Frontend/coverage/index.html
 ```
 
 ---
@@ -233,15 +277,20 @@ cd Backend/notification-service && npm test -- --coverage
 
 ```
 SmartLogix/
-├── Frontend/                  # React 18 SPA + PWA (Vite)
+├── Frontend/                   # React 18 SPA + PWA (Vite 6)
+│   └── src/
+│       ├── app/                # Auth, router, RBAC (access.ts)
+│       ├── hooks/              # useApiQuery, useCustomerScope, usePermissions...
+│       ├── pages/              # 20+ páginas por rol
+│       └── types/              # api.ts, domain.ts
 ├── Backend/
-│   ├── orders-service/        # Node.js Express :8081
-│   ├── inventory-service/     # Node.js Express :8082
-│   ├── shipping-service/      # Node.js Express :8084
-│   ├── notification-service/  # Node.js Express :8085
-│   ├── nginx/                 # Config BFF (API Gateway :8080)
-│   ├── shared/                # db, logger, validate, shutdown, security
-│   └── init-db.sql            # Creacion de 4 bases de datos
-├── ENTREGABLE/                # Documentacion de la rubrica
-└── docker-compose.yml         # Orquestacion completa (Docker Desktop)
+│   ├── orders-service/         # Node.js :8081 — pedidos + clientes + RLS
+│   ├── inventory-service/      # Node.js :8082 — stock + ventas
+│   ├── shipping-service/       # Node.js :8084 — envíos + tracking + entrega
+│   ├── notification-service/   # Node.js :8085 — trazabilidad
+│   ├── nginx/                  # Config API Gateway :8080
+│   ├── shared/                 # app, db, logger, validate, security, email
+│   └── seed.sql                # Datos de prueba
+├── ENTREGABLE/                 # Colección Postman + reporte Newman
+└── docker-compose.yml          # Orquestación completa
 ```

@@ -1,106 +1,109 @@
 # shipping-service
 
-Microservicio de envios y tracking. Node.js 22 + Express 4 + PostgreSQL.
+Microservicio de envíos y tracking. Node.js 22 + Express 4 + PostgreSQL.
+
+---
 
 ## Responsabilidad
 
-Gestiona la creacion de envios, genera numeros de tracking, controla las etapas del despacho y notifica cambios de estado al servicio de notificaciones.
+- Creación de envíos y generación de números de tracking (`TRACK-XXXXXXXX`)
+- Control de etapas del despacho
+- Validación de entrega: cruza código del cliente + RUT del receptor antes de marcar como `ENTREGADO`
+- Generación de código QR por envío
+- Notificación de cambios de etapa al notification-service
+
+---
 
 ## Puerto
 
 `8084` | Base de datos: `shipping_db`
 
+---
+
 ## Dependencias
 
-- express, pg, helmet, cors, express-rate-limit, uuid
-- shared/ (app, db, logger, validate, security, shutdown)
+- express, pg, helmet, cors, express-rate-limit, uuid, qrcode
+- shared/ (app, db, logger, validate, security)
+
+---
 
 ## Endpoints
 
-| Metodo | Ruta | Descripcion |
+| Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | /api/shipments/test | Health check |
-| GET | /api/shipments | Listar todos los envios |
-| GET | /api/shipments/:orderId | Buscar envio por ID de orden |
-| POST | /api/shipments | Crear envio `{orderId, customerId, sku, quantity}` |
-| PUT | /api/shipments/:id/stage?stage=X | Cambiar etapa del envio |
-| GET | /api/shipments/:id/qr | Obtener codigo QR del envio |
+| GET | `/api/shipments/test` | Health check |
+| GET | `/api/shipments` | Listar todos los envíos |
+| GET | `/api/shipments/:orderId` | Buscar envío por ID de orden |
+| POST | `/api/shipments` | Crear envío `{orderId, customerId, sku, quantity}` → `TRACK-XXXXXXXX` |
+| PUT | `/api/shipments/:id/stage?stage=X` | Cambiar etapa (ver validación ENTREGADO abajo) |
+| GET | `/api/shipments/:id/qr` | Código QR del envío (PNG base64) |
 
-## Etapas (stages)
+---
 
-- `EN_PREPARACION` - En preparacion en bodega
-- `EN_REPARTO` - En camino al cliente
-- `ENTREGADO` - Entregado al destinatario
-- `CANCELADO` - Envio cancelado
+## Etapas del envío
+
+| Etapa | Descripción |
+|-------|-------------|
+| `EN_PREPARACION` | En preparación en bodega |
+| `EN_REPARTO` | En camino al cliente |
+| `ENTREGADO` | Entregado — requiere validación |
+| `CANCELADO` | Envío cancelado |
+
+---
 
 ## Tracking
 
-Al crear un envio, se genera automaticamente un numero de tracking con formato `TRACK-XXXXXXXX` (8 caracteres hexadecimales aleatorios).
+Al crear un envío se genera automáticamente un número de tracking con formato `TRACK-XXXXXXXX` (8 caracteres hexadecimales aleatorios en mayúscula). Este número se usa para trazabilidad interna y en el QR de retiro.
 
-## Comunicacion con otros servicios
+---
 
-Al cambiar la etapa de un envio (`PUT /stage`), este servicio notifica al notification-service:
-- `POST /api/notifications` (notification-service) - Registra el evento de cambio de etapa
+## Validación de entrega (ENTREGADO)
 
-## Datos de entrega
+Al marcar como `ENTREGADO`, el body debe incluir:
 
-Al marcar como `ENTREGADO`, se pueden registrar:
-- `proofOfDeliveryImage` - Imagen de comprobante (base64)
-- `recipientRut` - RUT del receptor
-- `customerCode` - Codigo del cliente
-
-## Ejecucion
-
-### Con Docker (recomendado)
-
-```bash
-# Desde la raiz del proyecto
-docker compose -f docker-compose.node.yml up -d --build
+```json
+{
+  "customerCode": "SL-XXXXXX",
+  "recipientRut": "12.345.678-9",
+  "proofOfDeliveryImage": "data:image/jpeg;base64,..."
+}
 ```
 
-### Sin Docker (desarrollo)
+El shipping-service verifica contra orders-service:
+1. `customerCode` debe coincidir con `orders.client_code` de la orden asociada
+2. `recipientRut` debe coincidir con `customers.rut` del cliente de esa orden
 
-```bash
-cd Backend/shipping-service
-npm install
-DB_URL=postgresql://postgres:postgres@localhost:5432/shipping_db node src/index.js
+Si cualquiera de las dos validaciones falla, retorna `400` y la etapa no cambia.
+
+**Por qué importa la doble validación:** el transportista no conoce el `SL-XXXXXX` (el backend lo omite en sus respuestas). Debe pedírselo físicamente al cliente. Esto garantiza que la entrega fue hecha a la persona correcta.
+
+---
+
+## Notificación de eventos
+
+Al cambiar la etapa de cualquier envío, el servicio publica el evento en notification-service:
+
 ```
+POST /api/notifications {orderId, stage, timestamp, audience}
+```
+
+---
 
 ## Variables de entorno
 
-| Variable | Default | Descripcion |
+| Variable | Default | Descripción |
 |----------|---------|-------------|
-| PORT | 8084 | Puerto HTTP |
-| DB_URL | postgresql://postgres:postgres@postgres-db:5432/shipping_db | Conexion BD |
-| NOTIFICATION_SERVICE_URL | http://notification-service:8085 | URL del servicio de notificaciones |
-| ALLOWED_ORIGINS | * | CORS origins |
+| `PORT` | 8084 | Puerto HTTP |
+| `DATABASE_URL` | `postgresql://postgres:postgres@postgres-db:5432/shipping_db` | Conexión BD |
+| `NOTIFICATION_SERVICE_URL` | `http://notification-service:8085` | URL notification-service |
+| `ORDERS_SERVICE_URL` | `http://orders-service:8081` | URL orders-service (para validar entrega) |
 
-## Pruebas Unitarias
+---
 
-### Ejecutar pruebas
+## Pruebas
 
 ```bash
+cd Backend/shipping-service
 npm test
+npm test -- --coverage   # Reporte en coverage/index.html
 ```
-
-### Ejecutar con cobertura (genera reporte HTML)
-
-```bash
-npm test -- --coverage
-# Reporte generado en: coverage/index.html
-```
-
-### Ver reporte de cobertura
-
-Abrir `coverage/index.html` en el navegador.
-
-### Cobertura actual
-
-| M�trica    | Porcentaje |
-|------------|-----------|
-| Statements | ver coverage/index.html |
-| Branches   | ver coverage/index.html |
-| Functions  | ver coverage/index.html |
-| Lines      | ver coverage/index.html |
-
-Umbral m�nimo configurado: **60%** en todas las m�tricas.

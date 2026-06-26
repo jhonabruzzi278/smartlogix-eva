@@ -1,84 +1,141 @@
-﻿# SmartLogix Backend
+# SmartLogix — Backend
 
-Microservicios Node.js 22 con Express 4 y PostgreSQL 15.
+Cuatro microservicios Node.js 22 + Express 4 + PostgreSQL 15, orquestados con Docker Compose y expuestos a través de un API Gateway Nginx en el puerto 8080.
 
-## Requisitos
-
-- Docker y Docker Compose
-- Node.js 22 (solo para desarrollo sin Docker)
-
-## Levantar en local (desarrollo)
-
-```bash
-cd SmartLogix
-docker compose -f docker-compose.node.yml up -d --build
-curl http://localhost:80/healthz
-```
-
-## Levantar en VM (produccion)
-
-```bash
-cd ~/smartlogix
-docker compose -f docker-compose.vm.yml up -d
-curl http://localhost:80/healthz
-```
+---
 
 ## Servicios
 
-| Servicio | Puerto | Base de datos | Responsabilidad |
-|----------|--------|---------------|-----------------|
-| orders-service | 8081 | orders_db | Gestion de pedidos |
+| Servicio | Puerto | BD | Responsabilidad |
+|----------|--------|----|----------------|
+| orders-service | 8081 | orders_db | Pedidos, clientes, RLS por rol |
 | inventory-service | 8082 | inventory_db | Control de stock y ventas |
-| shipping-service | 8084 | shipping_db | Envios y tracking |
-| notification-service | 8085 | notification_db | Trazabilidad y auditoria |
-| nginx (BFF) | 80 | - | API Gateway / reverse proxy |
+| shipping-service | 8084 | shipping_db | Envíos, tracking, entrega validada |
+| notification-service | 8085 | notification_db | Trazabilidad y auditoría |
+| nginx (BFF) | **8080** | — | API Gateway / reverse proxy |
+
+---
+
+## Levantar el backend
+
+```bash
+# Desde la raíz del proyecto (donde está docker-compose.yml)
+docker compose up -d --build
+
+# Verificar estado
+docker compose ps
+
+# Logs en tiempo real
+docker compose logs -f
+
+# Reconstruir un servicio específico
+docker compose up -d --build orders-service
+
+# Detener todo
+docker compose down
+
+# Detener y borrar datos (volumen BD)
+docker compose down -v
+```
+
+Verificación rápida:
+```bash
+curl http://localhost:8080/healthz
+curl http://localhost:8080/api/orders/test
+```
+
+---
 
 ## Estructura de cada microservicio
 
 ```
 servicio/
 ├── Dockerfile         # Node.js 22 Alpine
-├── package.json       # Dependencias npm
+├── package.json
 └── src/
     └── index.js       # App Express con rutas REST
 ```
 
-## Modulos compartidos (shared/)
+---
 
-El directorio `Backend/shared/` contiene codigo reutilizado por todos los servicios:
+## Shared Modules (`Backend/shared/`)
 
-| Modulo | Funcion |
+Código reutilizado por todos los servicios sin duplicar:
+
+| Módulo | Función |
 |--------|---------|
-| `app.js` | Fabrica de apps Express (config, CORS, graceful shutdown) |
-| `db.js` | Pool de conexiones PostgreSQL |
-| `logger.js` | Logging estructurado con niveles |
-| `validate.js` | Validacion de entradas (ordenes, estados, etc.) |
+| `app.js` | Factory de apps Express (`createApp`), helper `interServiceFetch` |
+| `db.js` | Pool de conexiones PostgreSQL con reintentos |
+| `logger.js` | Logging estructurado con niveles configurables |
+| `validate.js` | Validación de body y estados de órdenes |
 | `security.js` | Helmet, CORS, rate limiting |
+| `email.js` | `sendEmail` + `buildOrderConfirmationEmail` (Nodemailer + HTML) |
 
-## Comunicacion entre servicios
+---
 
-La comunicacion es sincrona via REST usando `interServiceFetch()` definido en `shared/app.js`. El flujo principal:
+## Comunicación entre servicios
+
+Los servicios se comunican de forma síncrona via REST usando `interServiceFetch()` del shared module. Flujo principal:
 
 ```
-POST /api/orders (crear)
+POST /api/orders (crea orden con SL-XXXXXX)
   └── PUT /api/orders/:id/confirm
-        ├── POST /api/inventory/:sku/adjust?delta=-N  (descuenta stock)
-        ├── POST /api/shipments                       (crea envio)
-        └── (shipping-service notifica a notification-service al cambiar etapa)
+        ├── POST /api/inventory/:sku/adjust?delta=-N   (descuenta stock)
+        ├── POST /api/shipments                         (crea envío TRACK-XXXXXXXX)
+        └── UPDATE orders SET status='EN_PREPARACION'
 ```
 
-## Inicializacion de bases de datos
+Al cancelar una orden en estado `EN_PREPARACION` o `EN_REPARTO`:
+- Se restaura el stock (`adjust?delta=+N`)
+- Se cancela el envío asociado (`PUT /stage?stage=CANCELADO`)
 
-`init-db.sql` crea las 4 bases PostgreSQL:
-```sql
-CREATE DATABASE orders_db;
-CREATE DATABASE inventory_db;
-CREATE DATABASE shipping_db;
-CREATE DATABASE notification_db;
+---
+
+## Inicialización de bases de datos
+
+Cada servicio crea sus tablas al arrancar con `CREATE TABLE IF NOT EXISTS` — no requiere migraciones manuales.
+
+Para cargar datos de prueba:
+```bash
+docker exec -i smartlogix-db psql -U postgres -d orders_db < Backend/seed.sql
 ```
 
-Cada servicio crea sus propias tablas en el arranque via `ensureTables()`.
+`seed.sql` incluye productos, clientes, pedidos, envíos y notificaciones de ejemplo.
 
-## Datos de prueba
+---
 
-`seed.sql` contiene 10 productos, 10 pedidos, 6 envios y 8 notificaciones de ejemplo (negocio de bebidas y snacks).
+## Stored Procedures
+
+| Función | Servicio | Descripción |
+|---------|----------|-------------|
+| `fn_get_orders_with_customer(p_status)` | orders | Reporte JOIN orders + customers |
+| `fn_cancel_order(p_order_id, p_reason)` | orders | Cancelación atómica de orden |
+| `fn_adjust_stock(p_sku, p_delta)` | inventory | Ajuste de stock con validación |
+| `fn_inventory_report()` | inventory | Clasificación por nivel de stock |
+
+---
+
+## Variables de entorno
+
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Cadena de conexión PostgreSQL |
+| `PORT` | Puerto interno del servicio |
+| `INVENTORY_SERVICE_URL` | URL del inventory-service |
+| `SHIPPING_SERVICE_URL` | URL del shipping-service |
+| `NOTIFICATION_SERVICE_URL` | URL del notification-service |
+| `ORDERS_SERVICE_URL` | URL del orders-service (usado por shipping) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Correo (opcional) |
+
+---
+
+## Pruebas
+
+```bash
+cd Backend/orders-service && npm test -- --coverage
+cd Backend/inventory-service && npm test -- --coverage
+cd Backend/shipping-service && npm test -- --coverage
+cd Backend/notification-service && npm test -- --coverage
+```
+
+Reportes generados en `coverage/index.html` de cada servicio.
