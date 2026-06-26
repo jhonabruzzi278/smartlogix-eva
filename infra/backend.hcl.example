@@ -1,0 +1,4 @@
+bucket  = ""
+key     = "smartlogix/terraform.tfstate"
+region  = ""
+profile = ""
