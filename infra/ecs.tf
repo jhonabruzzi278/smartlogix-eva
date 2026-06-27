@@ -11,6 +11,11 @@ locals {
     { name = "SMTP_FROM", valueFrom = aws_ssm_parameter.smtp_from.arn },
     { name = "APP_URL",   valueFrom = aws_ssm_parameter.app_url.arn },
   ]
+
+  jwt_secrets = [
+    { name = "JWT_SECRET",    valueFrom = aws_ssm_parameter.jwt_secret.arn },
+    { name = "JWT_EXPIRES_IN",valueFrom = aws_ssm_parameter.jwt_expires_in.arn },
+  ]
 }
 
 # ─── Cluster ────────────────────────────────────────────────────────────────
@@ -130,7 +135,7 @@ resource "aws_ecs_task_definition" "smartlogix" {
         { name = "ALLOWED_ORIGINS",       value = "*" },
       ]
 
-      secrets = local.smtp_secrets
+      secrets = concat(local.smtp_secrets, local.jwt_secrets)
 
       portMappings = [{ containerPort = 8081, protocol = "tcp" }]
 
@@ -190,7 +195,7 @@ resource "aws_ecs_task_definition" "smartlogix" {
         { name = "ALLOWED_ORIGINS",          value = "*" },
       ]
 
-      secrets = local.smtp_secrets
+      secrets = concat(local.smtp_secrets, local.jwt_secrets)
 
       portMappings = [{ containerPort = 8084, protocol = "tcp" }]
 

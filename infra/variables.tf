@@ -64,3 +64,14 @@ variable "app_url" {
   description = "Public URL of the application (nginx public IP)"
   default     = "http://localhost"
 }
+
+variable "jwt_secret" {
+  description = "JWT signing secret (HS256)"
+  sensitive   = true
+  default     = ""
+}
+
+variable "jwt_expires_in" {
+  description = "JWT token expiration time"
+  default     = "8h"
+}

@@ -39,3 +39,15 @@ resource "aws_ssm_parameter" "db_password" {
   type  = "SecureString"
   value = var.db_password
 }
+
+resource "aws_ssm_parameter" "jwt_secret" {
+  name  = "/${var.project_name}/jwt_secret"
+  type  = "SecureString"
+  value = var.jwt_secret
+}
+
+resource "aws_ssm_parameter" "jwt_expires_in" {
+  name  = "/${var.project_name}/jwt_expires_in"
+  type  = "String"
+  value = var.jwt_expires_in
+}
