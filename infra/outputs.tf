@@ -25,17 +25,12 @@ output "vpc_id" {
 
 output "frontend_bucket" {
   description = "S3 bucket name for the frontend"
-  value       = data.aws_s3_bucket.frontend.id
+  value       = aws_s3_bucket.frontend.id
 }
 
-output "cloudfront_url" {
-  description = "CloudFront URL for the frontend"
-  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
-}
-
-output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID (needed for cache invalidation)"
-  value       = aws_cloudfront_distribution.frontend.id
+output "frontend_url" {
+  description = "URL pública del frontend (S3 static website)"
+  value       = "http://${aws_s3_bucket_website_configuration.frontend.website_endpoint}"
 }
 
 output "get_public_ip_command" {

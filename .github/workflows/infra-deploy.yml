@@ -25,8 +25,7 @@ env:
   TF_VAR_smtp_user:     ${{ secrets.SMTP_USER }}
   TF_VAR_smtp_pass:     ${{ secrets.SMTP_PASS }}
   TF_VAR_smtp_from:     ${{ secrets.SMTP_FROM }}
-  TF_VAR_app_url:                ${{ vars.APP_URL }}
-  TF_VAR_terraform_backend_bucket: ${{ vars.BUCKET_BACKEND }}
+  TF_VAR_app_url:       ${{ vars.APP_URL }}
 
 jobs:
   terraform:

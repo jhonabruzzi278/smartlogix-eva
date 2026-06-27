@@ -14,7 +14,7 @@ env:
 
 jobs:
   deploy:
-    name: "Build & Deploy to S3 + CloudFront"
+    name: "Build & Deploy to S3"
     runs-on: ubuntu-latest
 
     steps:
@@ -36,17 +36,6 @@ jobs:
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region:            ${{ env.AWS_REGION }}
 
-      - name: Resolve infra names
-        id: infra
-        run: |
-          BUCKET="${{ vars.BUCKET_BACKEND }}"
-          CF_ID=$(aws cloudfront list-distributions \
-            --query "DistributionList.Items[?contains(Origins.Items[].DomainName,'${BUCKET}.s3')].Id | [0]" \
-            --output text)
-          echo "bucket=${BUCKET}" >> $GITHUB_OUTPUT
-          echo "cf_id=${CF_ID}"   >> $GITHUB_OUTPUT
-          echo "Bucket: ${BUCKET} | CF: ${CF_ID}"
-
       - name: Install dependencies
         working-directory: Frontend
         run: npm ci
@@ -57,33 +46,19 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.APP_URL }}
         run: npm run build
 
-      # Assets con hash en el nombre → cache largo
-      - name: Upload assets to S3
+      - name: Deploy to S3
         run: |
-          aws s3 sync Frontend/dist/ s3://${{ steps.infra.outputs.bucket }}/frontend/ \
-            --delete \
-            --exclude "index.html" \
-            --cache-control "public,max-age=31536000,immutable"
-
-      # index.html siempre sin cache para que CloudFront sirva la versión nueva
-      - name: Upload index.html to S3
-        run: |
-          aws s3 cp Frontend/dist/index.html \
-            s3://${{ steps.infra.outputs.bucket }}/frontend/index.html \
+          BUCKET="${ENVIRONMENT}-${PROJECT}-frontend"
+          aws s3 sync Frontend/dist/ s3://${BUCKET}/ --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "index.html"
+          aws s3 cp Frontend/dist/index.html s3://${BUCKET}/index.html \
             --cache-control "no-cache,no-store,must-revalidate"
-
-      - name: Invalidate CloudFront cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ steps.infra.outputs.cf_id }} \
-            --paths "/*"
 
       - name: Print frontend URL
         run: |
-          CF_DOMAIN=$(aws cloudfront get-distribution \
-            --id ${{ steps.infra.outputs.cf_id }} \
-            --query 'Distribution.DomainName' --output text)
+          BUCKET="${ENVIRONMENT}-${PROJECT}-frontend"
           echo ""
           echo "=========================================="
-          echo "  Frontend: https://${CF_DOMAIN}"
+          echo "  Frontend: http://${BUCKET}.s3-website-${AWS_REGION}.amazonaws.com"
           echo "=========================================="
