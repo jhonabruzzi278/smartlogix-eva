@@ -2,25 +2,28 @@
 import { Key, LogIn, Mail } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getDefaultPathForRole, isPathAllowedForRole } from "@/app/access";
-import { DEFAULT_DEMO_PASSWORD, getRoleLabel } from "@/lib/user-registry";
 import { useAuth } from "@/app/auth";
-import { managedUsers } from "@/app/user-directory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const quickAccounts = managedUsers.map((user) => ({
-  username: user.username,
-  password: DEFAULT_DEMO_PASSWORD,
-  roleLabel: getRoleLabel(user.role)
-}));
+const quickAccounts = [
+  { username: "admin",         password: "Admin123!",   roleLabel: "Owner" },
+  { username: "operaciones",   password: "Ops123!",     roleLabel: "Operaciones" },
+  { username: "bodega",        password: "Bodega123!",  roleLabel: "Bodega" },
+  { username: "transportista", password: "Trans123!",   roleLabel: "Transportista" },
+  { username: "vendedor1",     password: "Vend123!",    roleLabel: "Vendedor" },
+  { username: "vendedor2",     password: "Vend123!",    roleLabel: "Vendedor" },
+  { username: "soporte",       password: "Sop123!",     roleLabel: "Soporte" },
+  { username: "cliente",       password: "Cli123!",     roleLabel: "Cliente" },
+];
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { session, login, loading, error } = useAuth();
-  const [username, setUsername] = useState("admin@smartlogix.cl");
-  const [password, setPassword] = useState(DEFAULT_DEMO_PASSWORD);
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("Admin123!");
   const [submitting, setSubmitting] = useState(false);
 
   const from = (location.state as { from?: string; deniedFrom?: string } | null)?.from;
@@ -70,10 +73,10 @@ export function LoginPage() {
               <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
               <Input
                 id="username"
-                type="email"
+                type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin@smartlogix.cl"
+                placeholder="admin"
                 autoComplete="username"
                 disabled={busy}
                 className="h-10 border-[#DDE0E2] bg-[#F8FBFD] pl-9 text-sm placeholder:text-[#6B7280]"
