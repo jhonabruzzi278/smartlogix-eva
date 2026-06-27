@@ -23,6 +23,8 @@ env:
   TF_VAR_smtp_pass:     ${{ secrets.SMTP_PASS }}
   TF_VAR_smtp_from:     ${{ secrets.SMTP_FROM }}
   TF_VAR_app_url:       ${{ vars.APP_URL }}
+  TF_VAR_jwt_secret:    ${{ secrets.JWT_SECRET }}
+  TF_VAR_jwt_expires_in: ${{ vars.JWT_EXPIRES_IN || '8h' }}
 
 jobs:
   terraform-destroy:
