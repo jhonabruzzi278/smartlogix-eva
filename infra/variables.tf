@@ -64,3 +64,8 @@ variable "app_url" {
   description = "Public URL of the application (nginx public IP)"
   default     = "http://localhost"
 }
+
+variable "terraform_backend_bucket" {
+  description = "Existing S3 bucket used as Terraform backend (reused for frontend hosting)"
+  type        = string
+}
