@@ -43,11 +43,12 @@ export function ShipmentsPage() {
     );
   }, [customerScope.isCustomer, customerScope.linkedCustomerId, orders]);
 
-  // Shipper: only orders explicitly assigned to this user
+  // Shipper: orders assigned to this user OR not yet assigned to anyone
   const shipperOrderIds = useMemo(() => {
     if (role !== "shipper" || !session?.username) return null;
+    const me = session.username;
     return new Set(
-      (orders ?? []).filter((o) => o.assignedTo === session.username).map((o) => o.id)
+      (orders ?? []).filter((o) => o.assignedTo === me || !o.assignedTo).map((o) => o.id)
     );
   }, [role, session?.username, orders]);
 
