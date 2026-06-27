@@ -165,6 +165,8 @@ resource "aws_ecs_task_definition" "smartlogix" {
         { name = "ALLOWED_ORIGINS", value = "*" },
       ]
 
+      secrets = local.jwt_secrets
+
       portMappings = [{ containerPort = 8082, protocol = "tcp" }]
 
       dependsOn = [{ containerName = "postgres", condition = "HEALTHY" }]
@@ -224,6 +226,8 @@ resource "aws_ecs_task_definition" "smartlogix" {
         { name = "DB_URL",          value = "postgresql://postgres:${var.db_password}@127.0.0.1:5432/notification_db" },
         { name = "ALLOWED_ORIGINS", value = "*" },
       ]
+
+      secrets = local.jwt_secrets
 
       portMappings = [{ containerPort = 8085, protocol = "tcp" }]
 
