@@ -100,24 +100,19 @@ jobs:
           docker push $REPO:$IMAGE_TAG
           docker push $REPO:latest
 
-      - name: Force new deployment on all services
+      - name: Force new deployment
         run: |
-          for SERVICE in orders-service inventory-service shipping-service notification-service nginx; do
-            echo "Deploying $SERVICE..."
-            aws ecs update-service \
-              --cluster $CLUSTER \
-              --service $SERVICE \
-              --force-new-deployment \
-              --query 'service.serviceName' \
-              --output text
-          done
+          aws ecs update-service \
+            --cluster $CLUSTER \
+            --service $CLUSTER \
+            --force-new-deployment \
+            --query 'service.serviceName' \
+            --output text
 
-      - name: Wait for services to stabilize
+      - name: Wait for service to stabilize
         run: |
-          for SERVICE in orders-service inventory-service shipping-service notification-service nginx; do
-            aws ecs wait services-stable --cluster $CLUSTER --services $SERVICE
-            echo "$SERVICE stable"
-          done
+          aws ecs wait services-stable --cluster $CLUSTER --services $CLUSTER
+          echo "Service stable"
 
       - name: Get nginx public IP
         run: |
@@ -137,6 +132,7 @@ jobs:
           echo "=========================================="
           echo "  API Gateway: http://$PUBLIC_IP"
           echo "  Health:      http://$PUBLIC_IP/healthz"
+          echo "  Orders:      http://$PUBLIC_IP/api/orders"
           echo "=========================================="
-          echo "  Si la IP cambió, actualiza el Repository Variable APP_URL"
+          echo "  Actualiza el Repository Variable APP_URL=http://$PUBLIC_IP"
           echo "=========================================="
