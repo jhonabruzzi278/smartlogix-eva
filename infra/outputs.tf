@@ -25,7 +25,7 @@ output "vpc_id" {
 
 output "frontend_bucket" {
   description = "S3 bucket name for the frontend"
-  value       = aws_s3_bucket.frontend.id
+  value       = data.aws_s3_bucket.frontend.id
 }
 
 output "cloudfront_url" {
