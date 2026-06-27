@@ -64,7 +64,7 @@ export async function registerUser(
   return response.json() as Promise<{ id: number; username: string; name: string; role: string }>;
 }
 
-export async function fetchUsers(token: string): Promise<Array<{ id: number; username: string; name: string; role: string }>> {
+export async function fetchUsers(token: string): Promise<Array<{ id: number; username: string; name: string; role: string; created_at: string; updated_at: string }>> {
   const response = await fetch("/api/auth/users", {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -73,5 +73,39 @@ export async function fetchUsers(token: string): Promise<Array<{ id: number; use
     throw new Error("No se pudo obtener la lista de usuarios");
   }
 
-  return response.json() as Promise<Array<{ id: number; username: string; name: string; role: string }>>;
+  return response.json() as Promise<Array<{ id: number; username: string; name: string; role: string; created_at: string; updated_at: string }>>;
+}
+
+export async function updateUser(
+  token: string,
+  id: number,
+  data: { name?: string; role?: string; password?: string }
+): Promise<{ id: number; username: string; name: string; role: string }> {
+  const response = await fetch(`/api/auth/users/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: "Error al actualizar" })) as { error?: string };
+    throw new Error(body.error || "Error al actualizar usuario");
+  }
+
+  return response.json() as Promise<{ id: number; username: string; name: string; role: string }>;
+}
+
+export async function deleteUser(token: string, id: number): Promise<void> {
+  const response = await fetch(`/api/auth/users/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: "Error al eliminar" })) as { error?: string };
+    throw new Error(body.error || "Error al eliminar usuario");
+  }
 }

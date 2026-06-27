@@ -1,5 +1,6 @@
 const { createApp } = require('../shared/app');
 const { validateNotificationBody } = require('../shared/validate');
+const { authMiddleware } = require('../shared/auth');
 const log = require('../shared/logger');
 
 const { app, pool, sendError, start } = createApp('notification_db', process.env.PORT || 8085);
@@ -19,7 +20,7 @@ async function ensureTables() {
   await pool.query(`ALTER TABLE notification_records ALTER COLUMN occurred_at DROP NOT NULL`).catch(() => {});
 }
 
-app.post('/api/notifications', async (req, res) => {
+app.post('/api/notifications', authMiddleware, async (req, res) => {
   try {
     const errors = validateNotificationBody(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
@@ -35,7 +36,7 @@ app.post('/api/notifications', async (req, res) => {
   }
 });
 
-app.get('/api/notifications/order/:orderId', async (req, res) => {
+app.get('/api/notifications/order/:orderId', authMiddleware, async (req, res) => {
   try {
     const rows = (await pool.query('SELECT * FROM notification_records WHERE order_id=$1 ORDER BY occurred_at ASC', [req.params.orderId])).rows;
     if (!rows.length) return res.status(404).json({ error: 'No hay notificaciones para esta orden' });
@@ -43,7 +44,7 @@ app.get('/api/notifications/order/:orderId', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed', err); }
 });
 
-app.get('/api/notifications/audience/:audience', async (req, res) => {
+app.get('/api/notifications/audience/:audience', authMiddleware, async (req, res) => {
   try {
     const raw = req.params.audience.toUpperCase();
     const aliasMap = { CUSTOMER: 'CLIENT', CLIENTE: 'CLIENT' };
@@ -53,7 +54,7 @@ app.get('/api/notifications/audience/:audience', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed', err); }
 });
 
-app.post('/api/notifications/alert', async (req, res) => {
+app.post('/api/notifications/alert', authMiddleware, async (req, res) => {
   try {
     const { sku, name, stock, type, vendor } = req.body;
     if (!sku || stock === undefined) return res.status(400).json({ error: 'sku y stock son requeridos' });
@@ -67,7 +68,7 @@ app.post('/api/notifications/alert', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed', err); }
 });
 
-app.delete('/api/notifications', async (req, res) => {
+app.delete('/api/notifications', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM notification_records');
     log.info('Notification history cleared', { deletedCount: result.rowCount });

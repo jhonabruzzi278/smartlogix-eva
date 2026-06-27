@@ -1,6 +1,7 @@
 ﻿const { createApp } = require('../shared/app');
 const { validateShipmentBody, validateShipmentStage } = require('../shared/validate');
 const { sendEmail, buildShipmentUpdateEmail } = require('../shared/email');
+const { authMiddleware } = require('../shared/auth');
 const log = require('../shared/logger');
 
 const { app, pool, sendError, start } = createApp('shipping_db', process.env.PORT || 8084);
@@ -17,18 +18,18 @@ async function ensureTables() {
   await pool.query(`CREATE TABLE IF NOT EXISTS processed_events (event_type VARCHAR(64) NOT NULL, event_key VARCHAR(128) NOT NULL, processed_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (event_type, event_key))`);
 }
 
-async function sendNotification(shipment, stage, message) {
+async function sendNotification(req, shipment, stage, message) {
   try {
-    await fetch(`${NOTIFICATION_URL}/api/notifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: require('uuid').v4(), orderId: shipment.order_id, customerId: shipment.customer_id, stage, status: shipment.status, message, sourceService: 'shipping-service', audience: 'BOTH', occurredAt: new Date().toISOString() }) });
+    await req.forwardedFetch(`${NOTIFICATION_URL}/api/notifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: require('uuid').v4(), orderId: shipment.order_id, customerId: shipment.customer_id, stage, status: shipment.status, message, sourceService: 'shipping-service', audience: 'BOTH', occurredAt: new Date().toISOString() }) });
   } catch (e) { log.error('Notification failed', { orderId: shipment.order_id, message: e.message }); }
 }
 
-app.get('/api/shipments', async (_req, res) => {
+app.get('/api/shipments', authMiddleware, async (_req, res) => {
   try { res.json((await pool.query('SELECT * FROM shipments ORDER BY created_at DESC')).rows); }
   catch (err) { sendError(res, 500, 'Failed', err); }
 });
 
-app.get('/api/shipments/:orderId', async (req, res) => {
+app.get('/api/shipments/:orderId', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM shipments WHERE order_id=$1', [req.params.orderId]);
     if (!r.rows.length) return res.status(404).json({ error: 'Envío no encontrado' });
@@ -36,7 +37,7 @@ app.get('/api/shipments/:orderId', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed', err); }
 });
 
-app.post('/api/shipments', async (req, res) => {
+app.post('/api/shipments', authMiddleware, async (req, res) => {
   try {
     const errors = validateShipmentBody(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
@@ -46,12 +47,12 @@ app.post('/api/shipments', async (req, res) => {
       return res.status(409).json({ error: `Ya existe envío para orden ${orderId}` });
     const tracking = 'TRACK-' + require('uuid').v4().substring(0, 8).toUpperCase();
     const shipment = (await pool.query(`INSERT INTO shipments (order_id,customer_id,sku,quantity,status,tracking_number,created_at) VALUES ($1,$2,$3,$4,'EN_PREPARACION',$5,NOW()) RETURNING *`, [orderId, customerId, sku, quantity, tracking])).rows[0];
-    await sendNotification(shipment, 'SHIPMENT_CREATED', `Envío creado tracking ${tracking}`);
+    await sendNotification(req, shipment, 'SHIPMENT_CREATED', `Envío creado tracking ${tracking}`);
     res.status(201).json(shipment);
   } catch (err) { sendError(res, 500, 'Failed to create shipment', err); }
 });
 
-app.put('/api/shipments/:id/stage', async (req, res) => {
+app.put('/api/shipments/:id/stage', authMiddleware, async (req, res) => {
   try {
     const stageErr = validateShipmentStage((req.query.stage || '').toUpperCase());
     if (stageErr.length) return res.status(400).json({ error: stageErr.join(', ') });
@@ -63,13 +64,13 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
     if (stage === 'EN_REPARTO') {
       updated = (await pool.query("UPDATE shipments SET status='EN_REPARTO',shipped_at=NOW() WHERE id=$1 RETURNING *", [req.params.id])).rows[0];
       notifStage = 'SHIPMENT_IN_TRANSIT'; notifMsg = `Envío en reparto - ${updated.tracking_number}`;
-      try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=EN_REPARTO`, { method: 'PUT' }); }
+      try { await req.forwardedFetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=EN_REPARTO`, { method: 'PUT' }); }
       catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
       if (shipment.customer_id && shipment.customer_id > 0) {
         try {
           const [orderRes, custRes] = await Promise.all([
-            fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}`),
-            fetch(`${ORDERS_URL}/api/customers/${shipment.customer_id}`)
+            req.forwardedFetch(`${ORDERS_URL}/api/orders/${shipment.order_id}`),
+            req.forwardedFetch(`${ORDERS_URL}/api/customers/${shipment.customer_id}`)
           ]);
           const [orderData, custData] = await Promise.all([orderRes.json(), custRes.json()]);
           if (custData && custData.email) {
@@ -88,7 +89,7 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
       let orderData = null;
       let customerData = null;
       try {
-        const orderRes = await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}`);
+        const orderRes = await req.forwardedFetch(`${ORDERS_URL}/api/orders/${shipment.order_id}`);
         if (orderRes.ok) orderData = await orderRes.json();
       } catch (e) { log.warn('Could not fetch order for validation', { orderId: shipment.order_id, message: e.message }); }
 
@@ -102,7 +103,7 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
 
       if (shipment.customer_id && shipment.customer_id !== 0) {
         try {
-          const custRes = await fetch(`${ORDERS_URL}/api/customers/${shipment.customer_id}`);
+          const custRes = await req.forwardedFetch(`${ORDERS_URL}/api/customers/${shipment.customer_id}`);
           if (custRes.ok) customerData = await custRes.json();
         } catch (e) { log.warn('Could not fetch customer for validation', { customerId: shipment.customer_id, message: e.message }); }
 
@@ -117,7 +118,7 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
 
       updated = (await pool.query("UPDATE shipments SET status='ENTREGADO',customer_code=$1,recipient_rut=$2,proof_of_delivery_image=$3 WHERE id=$4 RETURNING *", [p.customerCode||'', p.recipientRut||'', p.proofOfDeliveryImage||null, req.params.id])).rows[0];
       notifStage = 'SHIPMENT_DELIVERED'; notifMsg = `Envío entregado - ${updated.tracking_number}`;
-      try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=ENTREGADO`, { method: 'PUT' }); }
+      try { await req.forwardedFetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=ENTREGADO`, { method: 'PUT' }); }
       catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
       if (customerData && customerData.email) {
         const { subject, html } = buildShipmentUpdateEmail({
@@ -130,16 +131,16 @@ app.put('/api/shipments/:id/stage', async (req, res) => {
       updated = (await pool.query('UPDATE shipments SET status=$1 WHERE id=$2 RETURNING *', [stage, req.params.id])).rows[0];
       notifStage = 'SHIPMENT_CANCELLED'; notifMsg = `Envío cancelado - ${updated.tracking_number}`;
       if (stage === 'CANCELADO') {
-        try { await fetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=CANCELADO`, { method: 'PUT' }); }
+        try { await req.forwardedFetch(`${ORDERS_URL}/api/orders/${shipment.order_id}/status?status=CANCELADO`, { method: 'PUT' }); }
         catch (e) { log.warn('Order status sync failed', { orderId: shipment.order_id, message: e.message }); }
       }
     }
-    await sendNotification(updated, notifStage, notifMsg);
+    await sendNotification(req, updated, notifStage, notifMsg);
     res.json(updated);
   } catch (err) { sendError(res, 500, 'Failed to change stage', err); }
 });
 
-app.get('/api/shipments/:id/qr', async (req, res) => {
+app.get('/api/shipments/:id/qr', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM shipments WHERE id=$1', [req.params.id]);
     if (!r.rows.length) return res.status(404).json({ error: 'Envío no encontrado' });

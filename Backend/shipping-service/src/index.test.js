@@ -5,6 +5,14 @@ jest.mock('../shared/db', () => ({ createPool: jest.fn() }));
 jest.mock('../shared/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }));
 jest.mock('../shared/security', () => ({ applySecurity: jest.fn() }));
 jest.mock('../shared/shutdown', () => ({ gracefulShutdown: jest.fn() }));
+jest.mock('../shared/auth', () => ({
+  signToken: jest.fn().mockReturnValue('test-jwt'),
+  verifyToken: jest.fn().mockReturnValue({ sub: 'admin', role: 'owner', 'cognito:groups': ['owner'] }),
+  authMiddleware: (req, _res, next) => { req.user = { sub: 'admin', role: 'owner', 'cognito:groups': ['owner'] }; next(); },
+  requireRole: () => (req, _res, next) => next(),
+  extractRoleFromRequest: () => 'owner',
+  JWT_SECRET: 'test-secret',
+}));
 
 const request = require('supertest');
 const { createPool } = require('../shared/db');

@@ -1,84 +1,118 @@
-﻿import { useMemo, useState } from "react";
-import { Check, ChevronDown, Edit2, MoreHorizontal, Search, ShieldCheck, UserPlus, X } from "lucide-react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, ChevronDown, Edit2, MoreHorizontal, Search, Trash2, UserPlus, X } from "lucide-react";
 import { getRoleProfile } from "@/app/access";
-import { getVisibleNavItems } from "@/components/layout/navigation";
 import { useAuth } from "@/app/auth";
-import { managedUsers } from "@/app/user-directory";
+import { fetchUsers, registerUser, updateUser, deleteUser } from "@/lib/local-jwt-auth";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/domain";
 
 const ROLES: Role[] = ["owner", "ops", "warehouse", "support", "customer", "shipper", "vendor"];
 
-interface UserRow {
+interface UserRecord {
+  id: number;
   username: string;
   name: string;
   role: Role;
-  team: string;
-  active: boolean;
-  lastLogin: string;
-  modules: string[];
+  created_at: string;
+  updated_at: string;
 }
-
-const DEMO_USERS: UserRow[] = managedUsers.map((u) => ({
-  username: u.username,
-  name: u.name,
-  role: u.role,
-  team: u.team,
-  active: u.status === "active",
-  lastLogin: new Date(Date.now() - Math.random() * 86400000 * 3).toISOString(),
-  modules: getVisibleNavItems(u.role).map((m) => m.title),
-}));
 
 export function UsersPage() {
   const { session } = useAuth();
-  const [users, setUsers] = useState<UserRow[]>(DEMO_USERS);
+  const token = session?.token ?? "";
+  const [users, setUsers] = useState<UserRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [showMatrix, setShowMatrix] = useState(false);
-  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [newUser, setNewUser] = useState({ name: "", email: "", role: "ops" as Role, team: "Operaciones" });
+  const [newUser, setNewUser] = useState({ name: "", username: "", password: "", role: "ops" as Role });
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      const data = await fetchUsers(token);
+      setUsers(data.map((u) => ({ ...u, role: u.role as Role })));
+    } catch {
+      setFeedback("Error al cargar usuarios");
+      setTimeout(() => setFeedback(null), 3000);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const filtered = useMemo(() => {
     let list = users;
     if (roleFilter !== "all") list = list.filter((u) => u.role === roleFilter);
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter((u) => `${u.name} ${u.username} ${u.team}`.toLowerCase().includes(q));
+      list = list.filter((u) => `${u.name} ${u.username}`.toLowerCase().includes(q));
     }
     return list;
   }, [users, roleFilter, query]);
 
-  function toggleActive(username: string) {
-    setUsers((prev) => prev.map((u) => u.username === username ? { ...u, active: !u.active } : u));
-    setFeedback("Estado actualizado");
-    setTimeout(() => setFeedback(null), 2000);
+  async function handleDelete(id: number) {
+    if (!confirm("Eliminar este usuario?")) return;
+    try {
+      await deleteUser(token, id);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      setFeedback("Usuario eliminado");
+    } catch (e: any) {
+      setFeedback(e.message || "Error al eliminar");
+    }
+    setTimeout(() => setFeedback(null), 3000);
   }
 
-  function changeRole(username: string, role: Role) {
-    setUsers((prev) => prev.map((u) => u.username === username ? { ...u, role, modules: getVisibleNavItems(role).map((m) => m.title) } : u));
-    setEditingUser(null);
-    setFeedback("Rol actualizado");
-    setTimeout(() => setFeedback(null), 2000);
+  async function handleRoleChange(id: number, role: Role) {
+    try {
+      const updated = await updateUser(token, id, { role });
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: updated.role as Role } : u));
+      setEditingUser(null);
+      setFeedback("Rol actualizado");
+    } catch (e: any) {
+      setFeedback(e.message || "Error al actualizar rol");
+    }
+    setTimeout(() => setFeedback(null), 3000);
   }
 
-  function addUser() {
-    if (!newUser.name.trim() || !newUser.email.trim()) return;
-    const entry: UserRow = {
-      username: newUser.email.trim().toLowerCase(),
-      name: newUser.name.trim(),
-      role: newUser.role,
-      team: newUser.team,
-      active: true,
-      lastLogin: new Date().toISOString(),
-      modules: getVisibleNavItems(newUser.role).map((m) => m.title),
-    };
-    setUsers((prev) => [...prev, entry]);
-    setNewUser({ name: "", email: "", role: "ops", team: "Operaciones" });
-    setShowAdd(false);
-    setFeedback("Usuario agregado");
-    setTimeout(() => setFeedback(null), 2000);
+  async function handleAddUser() {
+    if (!newUser.name.trim() || !newUser.username.trim() || !newUser.password) {
+      setFeedback("Nombre, usuario y contraseña son requeridos");
+      setTimeout(() => setFeedback(null), 3000);
+      return;
+    }
+    try {
+      const created = await registerUser(token, {
+        username: newUser.username.trim().toLowerCase(),
+        password: newUser.password,
+        name: newUser.name.trim(),
+        role: newUser.role,
+      });
+      setUsers((prev) => [...prev, { ...created, role: created.role as Role, created_at: "", updated_at: "" }]);
+      setNewUser({ name: "", username: "", password: "", role: "ops" });
+      setShowAdd(false);
+      setFeedback("Usuario creado");
+    } catch (e: any) {
+      setFeedback(e.message || "Error al crear usuario");
+    }
+    setTimeout(() => setFeedback(null), 3000);
+  }
+
+  async function handleNameChange(id: number, name: string) {
+    try {
+      await updateUser(token, id, { name });
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, name } : u));
+      setEditingUser(null);
+      setFeedback("Nombre actualizado");
+    } catch (e: any) {
+      setFeedback(e.message || "Error");
+    }
+    setTimeout(() => setFeedback(null), 3000);
   }
 
   const initials = (name: string) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -102,6 +136,14 @@ export function UsersPage() {
     shipper: "bg-green-500",
     vendor: "bg-orange-500",
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-sm text-[#6B7280]">Cargando usuarios...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-md mx-auto sm:max-w-3xl md:max-w-5xl lg:max-w-7xl xl:max-w-screen-xl px-2">
@@ -127,8 +169,12 @@ export function UsersPage() {
               <input value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="h-9 w-full rounded border border-[#DDE0E2] bg-[#F8FBFD] px-3 text-sm" placeholder="Nombre completo" />
             </div>
             <div className="flex-1">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Email</label>
-              <input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="h-9 w-full rounded border border-[#DDE0E2] bg-[#F8FBFD] px-3 text-sm" placeholder="usuario@smartlogix.cl" />
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Usuario</label>
+              <input value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} className="h-9 w-full rounded border border-[#DDE0E2] bg-[#F8FBFD] px-3 text-sm" placeholder="usuario" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Contraseña</label>
+              <input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="h-9 w-full rounded border border-[#DDE0E2] bg-[#F8FBFD] px-3 text-sm" placeholder="••••••" />
             </div>
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.92px] text-[#6B7280] mb-1">Rol</label>
@@ -137,7 +183,7 @@ export function UsersPage() {
               </select>
             </div>
             <div className="flex gap-2">
-              <button onClick={addUser} className="h-9 rounded bg-[#4B98CF] px-4 text-xs font-bold text-white hover:bg-[#346384]">Crear</button>
+              <button onClick={handleAddUser} className="h-9 rounded bg-[#4B98CF] px-4 text-xs font-bold text-white hover:bg-[#346384]">Crear</button>
               <button onClick={() => setShowAdd(false)} className="h-9 rounded border border-[#DCE0E2] px-3 text-xs font-semibold text-[#6B7280] hover:bg-[#F5F7F9]">Cancelar</button>
             </div>
           </div>
@@ -149,7 +195,7 @@ export function UsersPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar usuario..." className="h-9 w-full rounded border border-[#DDE0E2] bg-white pl-9 pr-3 text-sm outline-none placeholder:text-[#6B7280]" />
         </div>
-        <div className="flex gap-1 rounded border border-[#DCE0E2] bg-white p-0.5 overflow-x-auto scroll-x">
+        <div className="flex gap-1 rounded border border-[#DCE0E2] bg-white p-0.5 overflow-x-auto">
           <button onClick={() => setRoleFilter("all")} className={cn("rounded px-3 py-1 text-[11px] font-semibold transition-colors", roleFilter === "all" ? "bg-[#4B98CF] text-white" : "text-[#6B7280] hover:text-[#112b4a]")}>Todos</button>
           {ROLES.map((r) => (
             <button key={r} onClick={() => setRoleFilter(r)} className={cn("rounded px-3 py-1 text-[11px] font-semibold transition-colors", roleFilter === r ? "bg-[#4B98CF] text-white" : "text-[#6B7280] hover:text-[#112b4a]")}>{getRoleProfile(r).label}</button>
@@ -161,8 +207,6 @@ export function UsersPage() {
         <div className="rounded border border-[#4EB4A5]/30 bg-[#4EB4A5]/5 px-4 py-2 text-xs font-medium text-[#4EB4A5]">{feedback}</div>
       )}
 
-
-      {/* Vista tipo card en móvil, tabla en sm+ */}
       <div className="rounded border border-[#DCE0E2] bg-white">
         <div className="block sm:hidden">
           {filtered.length === 0 && (
@@ -170,51 +214,43 @@ export function UsersPage() {
           )}
           <div className="flex flex-col gap-3 p-3">
             {filtered.map((user) => (
-              <div key={user.username} className="rounded border border-[#ECEEF0] bg-[#F8FBFD] p-4 flex flex-col gap-2">
+              <div key={user.id} className="rounded border border-[#ECEEF0] bg-[#F8FBFD] p-4 flex flex-col gap-2">
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-10 w-10 items-center justify-center rounded-full text-base font-bold text-white", roleInitialColors[user.role])}>
                     {initials(user.name)}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-[#112b4a]">{user.name}</p>
+                    {editingUser === user.id ? (
+                      <input
+                        defaultValue={user.name}
+                        onBlur={(e) => handleNameChange(user.id, e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleNameChange(user.id, (e.target as HTMLInputElement).value); }}
+                        className="h-8 rounded border border-[#DDE0E2] px-2 text-sm font-semibold"
+                        autoFocus
+                      />
+                    ) : (
+                      <p className="font-semibold text-[#112b4a]">{user.name}</p>
+                    )}
                     <p className="text-xs text-[#6B7280]">{user.username}</p>
                   </div>
-                  <button className="rounded p-1 text-[#6B7280] hover:bg-[#F5F7F9]"><MoreHorizontal className="h-4 w-4" /></button>
+                  <button onClick={() => handleDelete(user.id)} className="rounded p-1 text-[#6B7280] hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-[#6B7280]">
                   <span className="font-semibold text-[#4B98CF]">{getRoleProfile(user.role).label}</span>
-                  <span>{user.team}</span>
-                  <span>{new Date(user.lastLogin).toLocaleDateString("es-CL")}</span>
-                  <span>{user.active ? "Activo" : "Inactivo"}</span>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {user.modules.slice(0, 3).map((m) => (
-                    <span key={m} className="rounded bg-[#E3AA75]/10 px-2 py-0.5 text-[10px] text-[#E3AA75]">{m}</span>
-                  ))}
-                  {user.modules.length > 3 && <span className="text-[10px] text-[#6B7280]">+{user.modules.length - 3}</span>}
                 </div>
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={() => setEditingUser(user.username)}
-                    className={cn("inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold group border border-[#4B98CF] text-[#4B98CF]", editingUser === user.username && "bg-[#4B98CF]/10")}
+                    onClick={() => setEditingUser(user.id)}
+                    className={cn("inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold group border border-[#4B98CF] text-[#4B98CF]", editingUser === user.id && "bg-[#4B98CF]/10")}
                   >
-                    Editar rol
-                  </button>
-                  <button
-                    onClick={() => toggleActive(user.username)}
-                    className={cn(
-                      "flex h-7 w-12 rounded-full transition-colors p-0.5 border border-[#ECEEF0]",
-                      user.active ? "bg-[#4EB4A5]/20" : "bg-[#ECEEF0]"
-                    )}
-                  >
-                    <div className={cn("h-6 w-6 rounded-full bg-white shadow transition-transform", user.active ? "translate-x-5" : "")} />
+                    Editar
                   </button>
                 </div>
-                {editingUser === user.username && (
+                {editingUser === user.id && (
                   <div className="mt-2 flex items-center gap-2">
                     <select
                       value={user.role}
-                      onChange={(e) => changeRole(user.username, e.target.value as Role)}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
                       className="h-8 rounded border border-[#DDE0E2] bg-[#F8FBFD] px-2 text-xs"
                     >
                       {ROLES.map((r) => <option key={r} value={r}>{getRoleProfile(r).label}</option>)}
@@ -226,40 +262,47 @@ export function UsersPage() {
             ))}
           </div>
         </div>
-        {/* Tabla para sm+ */}
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[#ECEEF0] text-[0.6875rem] font-bold uppercase tracking-[0.92px] text-[#6B7280]">
                 <th className="px-4 py-3 w-10"></th>
                 <th className="px-4 py-3">Usuario</th>
-                <th className="px-4 py-3 hidden sm:table-cell">Equipo</th>
                 <th className="px-4 py-3">Rol</th>
-                <th className="px-4 py-3 w-20">Activo</th>
-                <th className="px-4 py-3 hidden md:table-cell">Último acceso</th>
-                <th className="px-4 py-3 hidden lg:table-cell">Modulos</th>
+                <th className="px-4 py-3 hidden md:table-cell">Creado</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((user) => (
-                <tr key={user.username} className="border-b border-[#F5F7F9] hover:bg-[#F5F7F9]">
+                <tr key={user.id} className="border-b border-[#F5F7F9] hover:bg-[#F5F7F9]">
                   <td className="px-4 py-3">
                     <div className={cn("flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white", roleInitialColors[user.role])}>
                       {initials(user.name)}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-[#112b4a]">{user.name}</p>
-                    <p className="text-xs text-[#6B7280]">{user.username}</p>
+                    {editingUser === user.id ? (
+                      <input
+                        defaultValue={user.name}
+                        onBlur={(e) => handleNameChange(user.id, e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleNameChange(user.id, (e.target as HTMLInputElement).value); }}
+                        className="h-8 rounded border border-[#DDE0E2] px-2 text-sm font-semibold w-full"
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <p className="font-semibold text-[#112b4a] cursor-pointer hover:text-[#4B98CF]" onClick={() => setEditingUser(user.id)}>{user.name}</p>
+                        <p className="text-xs text-[#6B7280]">{user.username}</p>
+                      </>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-[#6B7280] hidden sm:table-cell">{user.team}</td>
                   <td className="px-4 py-3">
-                    {editingUser === user.username ? (
+                    {editingUser === user.id ? (
                       <div className="flex items-center gap-1">
                         <select
                           value={user.role}
-                          onChange={(e) => changeRole(user.username, e.target.value as Role)}
+                          onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
                           className="h-8 rounded border border-[#DDE0E2] bg-[#F8FBFD] px-2 text-xs"
                         >
                           {ROLES.map((r) => <option key={r} value={r}>{getRoleProfile(r).label}</option>)}
@@ -268,7 +311,7 @@ export function UsersPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => setEditingUser(user.username)}
+                        onClick={() => setEditingUser(user.id)}
                         className={cn("inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold group", roleBadgeColors[user.role])}
                       >
                         {getRoleProfile(user.role).label}
@@ -276,42 +319,22 @@ export function UsersPage() {
                       </button>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => toggleActive(user.username)}
-                      className={cn(
-                        "flex h-6 w-10 rounded-full transition-colors p-0.5",
-                        user.active ? "bg-[#4EB4A5]" : "bg-[#ECEEF0]"
-                      )}
-                    >
-                      <div className={cn("h-5 w-5 rounded-full bg-white shadow transition-transform", user.active ? "translate-x-4" : "")} />
-                    </button>
-                  </td>
                   <td className="px-4 py-3 text-xs text-[#6B7280] hidden md:table-cell">
-                    {new Date(user.lastLogin).toLocaleDateString("es-CL")}
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {user.modules.slice(0, 3).map((m) => (
-                        <span key={m} className="rounded bg-[#F5F7F9] px-1.5 py-0.5 text-[10px] text-[#6B7280]">{m}</span>
-                      ))}
-                      {user.modules.length > 3 && <span className="text-[10px] text-[#6B7280]">+{user.modules.length - 3}</span>}
-                    </div>
+                    {user.created_at ? new Date(user.created_at).toLocaleDateString("es-CL") : "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button className="rounded p-1 text-[#6B7280] hover:bg-[#F5F7F9]"><MoreHorizontal className="h-4 w-4" /></button>
+                    <button onClick={() => handleDelete(user.id)} className="rounded p-1 text-[#6B7280] hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-[#6B7280]">Sin usuarios que coincidan</td></tr>
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-xs text-[#6B7280]">Sin usuarios que coincidan</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Permission matrix */}
       <div className="rounded border border-[#DCE0E2] bg-white">
         <button onClick={() => setShowMatrix(!showMatrix)} className="flex w-full items-center justify-between px-4 py-3 text-left">
           <h2 className="text-sm font-bold text-[#112b4a]">Matriz de permisos por rol</h2>
@@ -338,12 +361,12 @@ export function UsersPage() {
                   { perm: "Ver pedidos", key: "orders.view" },
                   { perm: "Crear pedidos", key: "orders.create" },
                   { perm: "Validar pedidos", key: "orders.review" },
-                  { perm: "Ver envíos", key: "shipments.view" },
-                  { perm: "Gestiónar envíos", key: "shipments.update" },
+                  { perm: "Ver envios", key: "shipments.view" },
+                  { perm: "Gestionar envios", key: "shipments.update" },
                   { perm: "Crear despachos", key: "shipments.dispatch" },
                   { perm: "Ver alertas", key: "alerts.view" },
                   { perm: "Ver usuarios", key: "users.view" },
-                  { perm: "Gestiónar usuarios", key: "users.manage" },
+                  { perm: "Gestionar usuarios", key: "users.manage" },
                 ].map(({ perm, key }) => (
                   <tr key={key} className="border-b border-[#F5F7F9]">
                     <td className="py-2 pr-4 font-medium text-[#112b4a]">{perm}</td>
@@ -354,7 +377,7 @@ export function UsersPage() {
                           {has ? (
                             <Check className="mx-auto h-4 w-4 text-[#4EB4A5]" />
                           ) : (
-                            <span className="text-[#DCE0E2]">�</span>
+                            <span className="text-[#DCE0E2]">-</span>
                           )}
                         </td>
                       );

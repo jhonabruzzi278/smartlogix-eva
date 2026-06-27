@@ -1,5 +1,6 @@
 const { createApp } = require('../shared/app');
 const { validateInventoryBody, validateSaleBody } = require('../shared/validate');
+const { authMiddleware } = require('../shared/auth');
 const log = require('../shared/logger');
 
 const { app, pool, sendError, start } = createApp('inventory_db', process.env.PORT || 8082);
@@ -59,17 +60,17 @@ async function ensureProcedures() {
   `);
 }
 
-app.get('/api/inventory', async (_req, res) => {
+app.get('/api/inventory', authMiddleware, async (_req, res) => {
   try { res.json((await pool.query('SELECT * FROM inventory ORDER BY id')).rows); }
   catch (err) { sendError(res, 500, 'Failed to list inventory', err); }
 });
 
-app.get('/api/inventory/report', async (_req, res) => {
+app.get('/api/inventory/report', authMiddleware, async (_req, res) => {
   try { res.json((await pool.query('SELECT * FROM fn_get_inventory_report()')).rows); }
   catch (err) { sendError(res, 500, 'Failed to get inventory report', err); }
 });
 
-app.get('/api/inventory/:sku', async (req, res) => {
+app.get('/api/inventory/:sku', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM inventory WHERE sku=$1', [req.params.sku]);
     if (!r.rows.length) return res.status(404).json({ error: 'SKU no encontrado' });
@@ -77,7 +78,7 @@ app.get('/api/inventory/:sku', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to get inventory', err); }
 });
 
-app.post('/api/inventory', async (req, res) => {
+app.post('/api/inventory', authMiddleware, async (req, res) => {
   try {
     const errors = validateInventoryBody(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
@@ -90,7 +91,7 @@ app.post('/api/inventory', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to create inventory', err); }
 });
 
-app.put('/api/inventory/:sku', async (req, res) => {
+app.put('/api/inventory/:sku', authMiddleware, async (req, res) => {
   try {
     if (req.body.stock === undefined || isNaN(Number(req.body.stock)) || Number(req.body.stock) < 0)
       return res.status(400).json({ error: 'stock must be >= 0' });
@@ -100,7 +101,7 @@ app.put('/api/inventory/:sku', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to update inventory', err); }
 });
 
-app.delete('/api/inventory/:sku', async (req, res) => {
+app.delete('/api/inventory/:sku', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query('DELETE FROM inventory WHERE sku=$1 RETURNING *', [req.params.sku]);
     if (!r.rows.length) return res.status(404).json({ error: 'SKU no encontrado' });
@@ -108,7 +109,7 @@ app.delete('/api/inventory/:sku', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to delete', err); }
 });
 
-app.post('/api/inventory/:sku/adjust', async (req, res) => {
+app.post('/api/inventory/:sku/adjust', authMiddleware, async (req, res) => {
   try {
     const delta = parseInt(req.query.delta, 10);
     if (isNaN(delta) || delta === 0) return res.status(400).json({ error: 'delta must be non-zero integer' });
@@ -123,12 +124,12 @@ app.post('/api/inventory/:sku/adjust', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to adjust stock', err); }
 });
 
-app.get('/api/sales', async (_req, res) => {
+app.get('/api/sales', authMiddleware, async (_req, res) => {
   try { res.json((await pool.query('SELECT * FROM sales ORDER BY sale_date DESC')).rows); }
   catch (err) { sendError(res, 500, 'Failed to list sales', err); }
 });
 
-app.post('/api/sales', async (req, res) => {
+app.post('/api/sales', authMiddleware, async (req, res) => {
   const client = await pool.connect();
   try {
     const errors = validateSaleBody(req.body);

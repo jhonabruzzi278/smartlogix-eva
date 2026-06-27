@@ -18,6 +18,17 @@ async function interServiceFetch(url, options) {
   return response;
 }
 
+function forwardedFetch(req) {
+  return async function (url, options = {}) {
+    const auth = req.headers['authorization'] || '';
+    const headers = { ...(options.headers || {}) };
+    if (auth && !headers['authorization']) {
+      headers['authorization'] = auth;
+    }
+    return interServiceFetch(url, { ...options, headers });
+  };
+}
+
 function createApp(dbName, port) {
   const app = express();
   applySecurity(app);
@@ -32,6 +43,11 @@ function createApp(dbName, port) {
     } catch {
       res.status(503).json({ status: 'DEGRADED', db: 'disconnected' });
     }
+  });
+
+  app.use((req, _res, next) => {
+    req.forwardedFetch = forwardedFetch(req);
+    next();
   });
 
   async function start() {

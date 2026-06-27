@@ -1,4 +1,4 @@
-﻿const { createApp, interServiceFetch } = require('../shared/app');
+﻿const { createApp } = require('../shared/app');
 const { validateOrderBody, validateOrderStatus } = require('../shared/validate');
 const { sendEmail, buildOrderConfirmationEmail } = require('../shared/email');
 const { signToken, authMiddleware, requireRole, extractRoleFromRequest } = require('../shared/auth');
@@ -265,10 +265,10 @@ app.put('/api/orders/:id/confirm', authMiddleware, async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
     const errors = [];
 
-    try { await interServiceFetch(`${INVENTORY_URL}/api/inventory/${order.sku}/adjust?delta=-${order.quantity}`, { method: 'POST' }); }
+    try { await req.forwardedFetch(`${INVENTORY_URL}/api/inventory/${order.sku}/adjust?delta=-${order.quantity}`, { method: 'POST' }); }
     catch (e) { log.error('Inventory adjustment failed', { orderId, message: e.message }); errors.push(`Inventario: ${e.message}`); }
 
-    try { await interServiceFetch(`${SHIPPING_URL}/api/shipments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: parseInt(orderId), customerId: order.customer_id, sku: order.sku, quantity: order.quantity }) }); }
+    try { await req.forwardedFetch(`${SHIPPING_URL}/api/shipments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: parseInt(orderId), customerId: order.customer_id, sku: order.sku, quantity: order.quantity }) }); }
     catch (e) { log.error('Shipment creation failed', { orderId, message: e.message }); errors.push(`Envío: ${e.message}`); }
 
     await pool.query("UPDATE orders SET status='EN_PREPARACION' WHERE id=$1", [orderId]);
@@ -285,14 +285,14 @@ app.put('/api/orders/:id/cancel', authMiddleware, async (req, res) => {
     const reason = (req.body.reason || '').substring(0, 255);
 
     if (order.status === 'EN_PREPARACION' || order.status === 'EN_REPARTO') {
-      try { await interServiceFetch(`${INVENTORY_URL}/api/inventory/${order.sku}/adjust?delta=+${order.quantity}`, { method: 'POST' }); }
+      try { await req.forwardedFetch(`${INVENTORY_URL}/api/inventory/${order.sku}/adjust?delta=+${order.quantity}`, { method: 'POST' }); }
       catch (e) { log.error('Stock restore failed', { orderId: req.params.id, message: e.message }); }
 
       try {
-        const shipmentResp = await interServiceFetch(`${SHIPPING_URL}/api/shipments/${order.id}`, { method: 'GET' });
+        const shipmentResp = await req.forwardedFetch(`${SHIPPING_URL}/api/shipments/${order.id}`, { method: 'GET' });
         const shipment = await shipmentResp.json();
         if (shipment && shipment.id && shipment.status !== 'CANCELADO') {
-          await interServiceFetch(`${SHIPPING_URL}/api/shipments/${shipment.id}/stage?stage=CANCELADO`, { method: 'PUT' });
+          await req.forwardedFetch(`${SHIPPING_URL}/api/shipments/${shipment.id}/stage?stage=CANCELADO`, { method: 'PUT' });
           log.info('Linked shipment cancelled', { orderId: req.params.id, shipmentId: shipment.id });
         }
       } catch (e) { log.warn('Shipment cancel failed', { orderId: req.params.id, message: e.message }); }
