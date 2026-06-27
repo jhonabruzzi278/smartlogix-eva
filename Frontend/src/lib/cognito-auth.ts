@@ -1,4 +1,5 @@
 import { generateDemoTokens, isLocalDemoEnvironment } from "@/lib/demo-auth";
+import { loginWithLocalJwt } from "@/lib/local-jwt-auth";
 
 const DEFAULT_COGNITO_ENDPOINT = import.meta.env.VITE_COGNITO_ENDPOINT ?? "/aws/cognito";
 const DEFAULT_COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID ?? "smartlogixwebclient";
@@ -177,9 +178,19 @@ export async function globalSignOut(accessToken: string): Promise<void> {
   );
 }
 
+function useLocalJwtAuth(): boolean {
+  if (import.meta.env.VITE_AUTH_MODE === "local") return true;
+  if (import.meta.env.VITE_AUTH_MODE === "demo" || import.meta.env.VITE_AUTH_MODE === "cognito") return false;
+  return !isLocalDemoEnvironment();
+}
+
 export async function loginWithCognitoOrDemo(username: string, password: string): Promise<CognitoAuthResult> {
   if (isLocalDemoEnvironment()) {
     return generateDemoTokens(username, password);
+  }
+
+  if (useLocalJwtAuth()) {
+    return loginWithLocalJwt(username, password);
   }
 
   return loginWithCognito(username, password);

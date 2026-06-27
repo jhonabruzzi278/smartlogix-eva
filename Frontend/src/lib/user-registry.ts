@@ -77,9 +77,33 @@ export const REGISTERED_USERS: RegisteredUser[] = [
   }
 ];
 
-export const USER_BY_USERNAME: Record<string, RegisteredUser> = Object.fromEntries(
-  REGISTERED_USERS.map((u) => [u.username.toLowerCase(), u])
-);
+export const USER_BY_USERNAME: Record<string, RegisteredUser> = {};
+
+for (const u of REGISTERED_USERS) {
+  USER_BY_USERNAME[u.username.toLowerCase()] = u;
+}
+
+const SIMPLE_ALIASES: Record<string, string> = {
+  admin: "admin@smartlogix.cl",
+  operaciones: "operaciones@smartlogix.cl",
+  ops: "operaciones@smartlogix.cl",
+  bodega: "bodega@smartlogix.cl",
+  warehouse: "bodega@smartlogix.cl",
+  transportista: "transportista@smartlogix.cl",
+  shipper: "transportista@smartlogix.cl",
+  vendedor1: "maria@smartlogix.cl",
+  vendedor2: "carlos@smartlogix.cl",
+  soporte: "soporte@smartlogix.cl",
+  support: "soporte@smartlogix.cl",
+  cliente: "cliente@smartlogix.cl",
+  customer: "cliente@smartlogix.cl",
+};
+
+for (const [alias, email] of Object.entries(SIMPLE_ALIASES)) {
+  if (USER_BY_USERNAME[email]) {
+    USER_BY_USERNAME[alias] = USER_BY_USERNAME[email];
+  }
+}
 
 export const DEFAULT_DEMO_PASSWORD =
   (typeof window !== "undefined"

@@ -1,12 +1,15 @@
 ﻿const { createApp, interServiceFetch } = require('../shared/app');
 const { validateOrderBody, validateOrderStatus } = require('../shared/validate');
 const { sendEmail, buildOrderConfirmationEmail } = require('../shared/email');
+const { signToken, authMiddleware, requireRole, extractRoleFromRequest } = require('../shared/auth');
 const log = require('../shared/logger');
 
 const { app, pool, sendError, start } = createApp('orders_db', process.env.PORT || 8081);
 
 const INVENTORY_URL = process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:8082';
 const SHIPPING_URL = process.env.SHIPPING_SERVICE_URL || 'http://shipping-service:8084';
+
+let bcrypt;
 
 async function ensureTables() {
   await pool.query(`CREATE TABLE IF NOT EXISTS orders (
@@ -18,6 +21,34 @@ async function ensureTables() {
     id SERIAL PRIMARY KEY, name VARCHAR(200) NOT NULL, phone VARCHAR(30),
     address VARCHAR(300), email VARCHAR(200), created_at TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS rut VARCHAR(20)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(200) NOT NULL, role VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())`);
+}
+
+async function seedUsers() {
+  bcrypt = require('bcryptjs');
+  const existing = await pool.query('SELECT COUNT(*) as cnt FROM users');
+  if (parseInt(existing.rows[0].cnt) > 0) return;
+
+  const users = [
+    { username: 'admin',        password: 'Admin123!', name: 'Administrador',     role: 'owner' },
+    { username: 'operaciones',  password: 'Ops123!',   name: 'Operador Logístico', role: 'ops' },
+    { username: 'bodega',       password: 'Bodega123!',name: 'Encargado Bodega',  role: 'warehouse' },
+    { username: 'transportista',password: 'Trans123!',  name: 'Transportista',     role: 'shipper' },
+    { username: 'vendedor1',    password: 'Vend123!',   name: 'María Vendedora',   role: 'vendor' },
+    { username: 'vendedor2',    password: 'Vend123!',   name: 'Carlos Ventas',     role: 'vendor' },
+    { username: 'soporte',      password: 'Sop123!',    name: 'Soporte Técnico',   role: 'support' },
+    { username: 'cliente',      password: 'Cli123!',    name: 'Cliente Demo',       role: 'customer' },
+  ];
+
+  for (const u of users) {
+    const hash = await bcrypt.hash(u.password, 10);
+    await pool.query('INSERT INTO users (username, password_hash, name, role) VALUES ($1,$2,$3,$4)',
+      [u.username, hash, u.name, u.role]);
+  }
+  log.info('Demo users seeded');
 }
 
 async function ensureProcedures() {
@@ -51,23 +82,83 @@ async function ensureProcedures() {
 // Roles that must NOT receive client_code in any response
 const RESTRICTED_ROLES = new Set(['shipper', 'customer', 'vendor']);
 
-function extractRoleFromRequest(req) {
-  try {
-    const auth = req.headers['authorization'] || '';
-    const token = auth.replace(/^Bearer\s+/i, '');
-    if (!token) return null;
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-    const groups = payload['cognito:groups'];
-    return Array.isArray(groups) && groups.length ? groups[0].toLowerCase() : null;
-  } catch { return null; }
-}
-
 function stripClientCode(rows) {
   rows.forEach(r => { delete r.client_code; });
   return rows;
 }
+
+// ═══ AUTH ENDPOINTS ═══════════════════════════════════════════════════════════════
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    bcrypt = require('bcryptjs');
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+    }
+    const r = await pool.query('SELECT * FROM users WHERE username=$1', [username.trim().toLowerCase()]);
+    if (!r.rows.length) return res.status(401).json({ error: 'Credenciales invalidas' });
+    const user = r.rows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Credenciales invalidas' });
+    const token = signToken(user);
+    res.json({ token, role: user.role, name: user.name, username: user.username });
+  } catch (err) { sendError(res, 500, 'Login failed', err); }
+});
+
+app.post('/api/auth/register', authMiddleware, requireRole('owner', 'admin'), async (req, res) => {
+  try {
+    bcrypt = require('bcryptjs');
+    const { username, password, name, role } = req.body;
+    if (!username || !password || !name || !role) {
+      return res.status(400).json({ error: 'username, password, name y role son requeridos' });
+    }
+    const validRoles = ['owner', 'ops', 'warehouse', 'shipper', 'vendor', 'support', 'customer'];
+    if (!validRoles.includes(role.toLowerCase())) {
+      return res.status(400).json({ error: 'Rol invalido. Validos: ' + validRoles.join(', ') });
+    }
+    const exists = await pool.query('SELECT 1 FROM users WHERE username=$1', [username.trim().toLowerCase()]);
+    if (exists.rows.length) return res.status(409).json({ error: 'El usuario ya existe' });
+    const hash = await bcrypt.hash(password, 10);
+    const user = (await pool.query(
+      'INSERT INTO users (username, password_hash, name, role) VALUES ($1,$2,$3,$4) RETURNING id, username, name, role, created_at',
+      [username.trim().toLowerCase(), hash, name.trim(), role.toLowerCase()])).rows[0];
+    res.status(201).json(user);
+  } catch (err) { sendError(res, 500, 'Register failed', err); }
+});
+
+app.get('/api/auth/users', authMiddleware, requireRole('owner', 'admin'), async (_req, res) => {
+  try {
+    const rows = (await pool.query('SELECT id, username, name, role, created_at, updated_at FROM users ORDER BY username')).rows;
+    res.json(rows);
+  } catch (err) { sendError(res, 500, 'Failed to list users', err); }
+});
+
+app.put('/api/auth/users/:id', authMiddleware, requireRole('owner', 'admin'), async (req, res) => {
+  try {
+    bcrypt = require('bcryptjs');
+    const { name, role, password } = req.body;
+    const existing = (await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id])).rows[0];
+    if (!existing) return res.status(404).json({ error: 'Usuario no encontrado' });
+    const newName = name || existing.name;
+    const newRole = role || existing.role;
+    const hash = password ? await bcrypt.hash(password, 10) : existing.password_hash;
+    const updated = (await pool.query(
+      'UPDATE users SET name=$1, role=$2, password_hash=$3, updated_at=NOW() WHERE id=$4 RETURNING id, username, name, role, created_at, updated_at',
+      [newName, newRole.toLowerCase(), hash, req.params.id])).rows[0];
+    res.json(updated);
+  } catch (err) { sendError(res, 500, 'Failed to update user', err); }
+});
+
+app.delete('/api/auth/users/:id', authMiddleware, requireRole('owner', 'admin'), async (req, res) => {
+  try {
+    const r = await pool.query('DELETE FROM users WHERE id=$1 RETURNING id, username', [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ message: 'Usuario eliminado', user: r.rows[0] });
+  } catch (err) { sendError(res, 500, 'Failed to delete user', err); }
+});
+
+// ═══ ORDER ENDPOINTS ═══════════════════════════════════════════════════════════════
 
 app.get('/api/orders/test', (_req, res) => res.send('orders-service UP'));
 
@@ -86,7 +177,7 @@ app.get('/api/orders/track/:clientCode', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to track order', err); }
 });
 
-app.get('/api/orders/report', async (req, res) => {
+app.get('/api/orders/report', authMiddleware, async (req, res) => {
   try {
     const status = req.query.status ? req.query.status.toUpperCase() : null;
     const r = await pool.query('SELECT * FROM fn_get_orders_with_customer($1)', [status]);
@@ -94,7 +185,7 @@ app.get('/api/orders/report', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to get orders report', err); }
 });
 
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
     const errors = validateOrderBody(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
@@ -127,7 +218,7 @@ app.post('/api/orders', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to create order', err); }
 });
 
-app.get('/api/orders', async (req, res) => {
+app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
     const role = extractRoleFromRequest(req);
     const limit = req.query.limit ? Math.min(500, Math.max(1, parseInt(req.query.limit))) : null;
@@ -146,7 +237,7 @@ app.get('/api/orders', async (req, res) => {
   catch (err) { sendError(res, 500, 'Failed to list orders', err); }
 });
 
-app.get('/api/orders/:id', async (req, res) => {
+app.get('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
     const role = extractRoleFromRequest(req);
     const r = await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.id]);
@@ -157,7 +248,7 @@ app.get('/api/orders/:id', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to get order', err); }
 });
 
-app.put('/api/orders/:id/status', async (req, res) => {
+app.put('/api/orders/:id/status', authMiddleware, async (req, res) => {
   try {
     const statusErr = validateOrderStatus(req.query.status?.toUpperCase() || '');
     if (statusErr.length) return res.status(400).json({ error: statusErr.join(', ') });
@@ -167,7 +258,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to update status', err); }
 });
 
-app.put('/api/orders/:id/confirm', async (req, res) => {
+app.put('/api/orders/:id/confirm', authMiddleware, async (req, res) => {
   const orderId = req.params.id;
   try {
     const order = (await pool.query('SELECT * FROM orders WHERE id=$1', [orderId])).rows[0];
@@ -187,7 +278,7 @@ app.put('/api/orders/:id/confirm', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to confirm order', err); }
 });
 
-app.put('/api/orders/:id/cancel', async (req, res) => {
+app.put('/api/orders/:id/cancel', authMiddleware, async (req, res) => {
   try {
     const order = (await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.id])).rows[0];
     if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
@@ -212,7 +303,7 @@ app.put('/api/orders/:id/cancel', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to cancel order', err); }
 });
 
-app.put('/api/orders/:id/assign', async (req, res) => {
+app.put('/api/orders/:id/assign', authMiddleware, async (req, res) => {
   try {
     const transporter = (req.query.transporter || '').substring(0, 100);
     if (!transporter) return res.status(400).json({ error: 'transporter es requerido' });
@@ -222,7 +313,7 @@ app.put('/api/orders/:id/assign', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to assign', err); }
 });
 
-app.delete('/api/orders/:id', async (req, res) => {
+app.delete('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM orders WHERE id=$1 RETURNING *', [req.params.id]);
     if (!result.rows.length) return res.status(404).json({ error: 'Orden no encontrada' });
@@ -231,12 +322,12 @@ app.delete('/api/orders/:id', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to delete order', err); }
 });
 
-app.get('/api/customers', async (_req, res) => {
+app.get('/api/customers', authMiddleware, async (_req, res) => {
   try { res.json((await pool.query('SELECT * FROM customers ORDER BY name')).rows); }
   catch (err) { sendError(res, 500, 'Failed to list customers', err); }
 });
 
-app.get('/api/customers/:id', async (req, res) => {
+app.get('/api/customers/:id', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM customers WHERE id=$1', [req.params.id]);
     if (!r.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -244,7 +335,7 @@ app.get('/api/customers/:id', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to get customer', err); }
 });
 
-app.post('/api/customers', async (req, res) => {
+app.post('/api/customers', authMiddleware, async (req, res) => {
   try {
     const { name, phone, address, email, rut } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
@@ -255,7 +346,7 @@ app.post('/api/customers', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to create customer', err); }
 });
 
-app.put('/api/customers/:id', async (req, res) => {
+app.put('/api/customers/:id', authMiddleware, async (req, res) => {
   try {
     const { name, phone, address, email, rut } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
@@ -267,7 +358,7 @@ app.put('/api/customers/:id', async (req, res) => {
   } catch (err) { sendError(res, 500, 'Failed to update customer', err); }
 });
 
-app.delete('/api/customers/:id', async (req, res) => {
+app.delete('/api/customers/:id', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query('DELETE FROM customers WHERE id=$1 RETURNING *', [req.params.id]);
     if (!r.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -276,7 +367,7 @@ app.delete('/api/customers/:id', async (req, res) => {
 });
 
 if (require.main === module) {
-  (async () => { await ensureTables(); await ensureProcedures(); start(); })();
+  (async () => { await ensureTables(); await seedUsers(); await ensureProcedures(); start(); })();
 }
 
 module.exports = { app };

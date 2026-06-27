@@ -42,6 +42,8 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_FROM=${SMTP_FROM}
       - APP_URL=${APP_URL}
+      - JWT_SECRET=${JWT_SECRET:-smartlogix-jwt-secret-change-me}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
     ports:
       - "8081:8081"
     depends_on:
@@ -85,6 +87,8 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_FROM=${SMTP_FROM}
       - APP_URL=${APP_URL}
+      - JWT_SECRET=${JWT_SECRET:-smartlogix-jwt-secret-change-me}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
     ports:
       - "8084:8084"
     depends_on:
