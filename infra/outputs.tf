@@ -23,6 +23,21 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
+output "frontend_bucket" {
+  description = "S3 bucket name for the frontend"
+  value       = aws_s3_bucket.frontend.id
+}
+
+output "cloudfront_url" {
+  description = "CloudFront URL for the frontend"
+  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (needed for cache invalidation)"
+  value       = aws_cloudfront_distribution.frontend.id
+}
+
 output "get_public_ip_command" {
   description = "Run this after deploy to get the nginx public IP"
   value       = "aws ecs list-tasks --cluster ${aws_ecs_cluster.main.name} --service-name ${aws_ecs_service.smartlogix.name} --query 'taskArns[0]' --output text | xargs -I{} aws ecs describe-tasks --cluster ${aws_ecs_cluster.main.name} --tasks {} --query \"tasks[0].attachments[0].details[?name=='networkInterfaceId'].value\" --output text | xargs -I{} aws ec2 describe-network-interfaces --network-interface-ids {} --query 'NetworkInterfaces[0].Association.PublicIp' --output text"

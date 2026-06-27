@@ -1,0 +1,89 @@
+name: "SmartLogix - Deploy Frontend"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Frontend/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION:  ${{ vars.AWS_REGION }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+  PROJECT:     ${{ vars.PROJECT_NAME }}
+
+jobs:
+  deploy:
+    name: "Build & Deploy to S3 + CloudFront"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Resolve infra names
+        id: infra
+        run: |
+          BUCKET="${ENVIRONMENT}-${PROJECT}-frontend"
+          CF_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Origins.Items[].DomainName,'${BUCKET}.s3')].Id | [0]" \
+            --output text)
+          echo "bucket=${BUCKET}" >> $GITHUB_OUTPUT
+          echo "cf_id=${CF_ID}"   >> $GITHUB_OUTPUT
+          echo "Bucket: ${BUCKET} | CF: ${CF_ID}"
+
+      - name: Install dependencies
+        working-directory: Frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: Frontend
+        env:
+          VITE_API_BASE_URL: ${{ vars.APP_URL }}
+        run: npm run build
+
+      # Assets con hash en el nombre → cache largo
+      - name: Upload assets to S3
+        run: |
+          aws s3 sync Frontend/dist/ s3://${{ steps.infra.outputs.bucket }}/ \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public,max-age=31536000,immutable"
+
+      # index.html siempre sin cache para que CloudFront sirva la versión nueva
+      - name: Upload index.html to S3
+        run: |
+          aws s3 cp Frontend/dist/index.html \
+            s3://${{ steps.infra.outputs.bucket }}/index.html \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.infra.outputs.cf_id }} \
+            --paths "/*"
+
+      - name: Print frontend URL
+        run: |
+          CF_DOMAIN=$(aws cloudfront get-distribution \
+            --id ${{ steps.infra.outputs.cf_id }} \
+            --query 'Distribution.DomainName' --output text)
+          echo ""
+          echo "=========================================="
+          echo "  Frontend: https://${CF_DOMAIN}"
+          echo "=========================================="
