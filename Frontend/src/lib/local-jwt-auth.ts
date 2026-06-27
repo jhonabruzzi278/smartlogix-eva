@@ -1,5 +1,11 @@
 import type { CognitoAuthResult } from "@/lib/cognito-auth";
 import { decodeJwtPayload } from "@/lib/cognito-auth";
+import { readApiConfig } from "@/lib/api-config";
+
+function apiUrl(path: string): string {
+  const { baseUrl } = readApiConfig();
+  return `${baseUrl}${path}`;
+}
 
 interface LoginResponse {
   token: string;
@@ -9,7 +15,7 @@ interface LoginResponse {
 }
 
 export async function loginWithLocalJwt(username: string, password: string): Promise<CognitoAuthResult> {
-  const response = await fetch("/api/auth/login", {
+  const response = await fetch(apiUrl("/api/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -47,7 +53,7 @@ export async function registerUser(
   token: string,
   userData: { username: string; password: string; name: string; role: string }
 ): Promise<{ id: number; username: string; name: string; role: string }> {
-  const response = await fetch("/api/auth/register", {
+  const response = await fetch(apiUrl("/api/auth/register"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -65,7 +71,7 @@ export async function registerUser(
 }
 
 export async function fetchUsers(token: string): Promise<Array<{ id: number; username: string; name: string; role: string; created_at: string; updated_at: string }>> {
-  const response = await fetch("/api/auth/users", {
+  const response = await fetch(apiUrl("/api/auth/users"), {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -81,7 +87,7 @@ export async function updateUser(
   id: number,
   data: { name?: string; role?: string; password?: string }
 ): Promise<{ id: number; username: string; name: string; role: string }> {
-  const response = await fetch(`/api/auth/users/${id}`, {
+  const response = await fetch(apiUrl(`/api/auth/users/${id}`), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -99,7 +105,7 @@ export async function updateUser(
 }
 
 export async function deleteUser(token: string, id: number): Promise<void> {
-  const response = await fetch(`/api/auth/users/${id}`, {
+  const response = await fetch(apiUrl(`/api/auth/users/${id}`), {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
