@@ -173,3 +173,7 @@ export function setApiAuthErrorListener(listener: ((status: number) => void) | n
 export function setApiAuthRefreshHandler(handler: (() => Promise<string | null>) | null) {
   apiClient.setAuthRefreshHandler(handler);
 }
+
+export function updateApiToken(token: string | null): void {
+  apiClient.setToken(token);
+}
