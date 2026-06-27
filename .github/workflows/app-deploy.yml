@@ -116,7 +116,7 @@ jobs:
 
       - name: Get nginx public IP
         run: |
-          TASK_ARN=$(aws ecs list-tasks --cluster $CLUSTER --service-name nginx \
+          TASK_ARN=$(aws ecs list-tasks --cluster $CLUSTER --service-name $CLUSTER \
             --query 'taskArns[0]' --output text)
 
           ENI_ID=$(aws ecs describe-tasks --cluster $CLUSTER --tasks $TASK_ARN \

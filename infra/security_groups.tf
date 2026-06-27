@@ -42,4 +42,8 @@ resource "aws_security_group" "efs" {
   }
 
   tags = { Name = "${local.name_prefix}-efs-sg" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
