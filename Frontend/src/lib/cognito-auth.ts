@@ -141,6 +141,10 @@ export async function refreshCognitoSession(refreshToken: string): Promise<Cogni
     return generateDemoTokens(username, "Smartlogix123!");
   }
 
+  if (useLocalJwtAuth()) {
+    throw new Error("La sesion expiro. Vuelve a iniciar sesion.");
+  }
+
   const data = await postToCognito<{
     AuthenticationResult?: {
       AccessToken?: string;
@@ -165,7 +169,7 @@ export async function refreshCognitoSession(refreshToken: string): Promise<Cogni
 }
 
 export async function globalSignOut(accessToken: string): Promise<void> {
-  if (isLocalDemoEnvironment()) {
+  if (isLocalDemoEnvironment() || useLocalJwtAuth()) {
     return;
   }
 
@@ -178,7 +182,7 @@ export async function globalSignOut(accessToken: string): Promise<void> {
   );
 }
 
-function useLocalJwtAuth(): boolean {
+export function useLocalJwtAuth(): boolean {
   if (import.meta.env.VITE_AUTH_MODE === "local") return true;
   if (import.meta.env.VITE_AUTH_MODE === "demo" || import.meta.env.VITE_AUTH_MODE === "cognito") return false;
   return !isLocalDemoEnvironment();

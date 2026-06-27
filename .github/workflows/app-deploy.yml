@@ -10,6 +10,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: write
 
 env:
   AWS_REGION:  ${{ vars.AWS_REGION }}
@@ -114,7 +115,9 @@ jobs:
           aws ecs wait services-stable --cluster $CLUSTER --services $CLUSTER
           echo "Service stable"
 
-      - name: Get nginx public IP
+      - name: Get nginx public IP and redeploy frontend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TASK_ARN=$(aws ecs list-tasks --cluster $CLUSTER --service-name $CLUSTER \
             --query 'taskArns[0]' --output text)
@@ -134,5 +137,12 @@ jobs:
           echo "  Health:      http://$PUBLIC_IP/healthz"
           echo "  Orders:      http://$PUBLIC_IP/api/orders"
           echo "=========================================="
-          echo "  Actualiza el Repository Variable APP_URL=http://$PUBLIC_IP"
+
+          echo "Disparando deploy del frontend con nueva IP..."
+          gh workflow run frontend-deploy.yml \
+            --repo ${{ github.repository }} \
+            --field api_url=http://$PUBLIC_IP
+
+          echo "  Frontend deploy iniciado. Espera 2-3 min y accede a:"
+          echo "  http://${ENVIRONMENT}-${PROJECT}-frontend.s3-website-${AWS_REGION}.amazonaws.com"
           echo "=========================================="
