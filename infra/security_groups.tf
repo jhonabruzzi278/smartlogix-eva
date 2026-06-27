@@ -1,7 +1,8 @@
 resource "aws_security_group" "smartlogix" {
-  name        = "${local.name_prefix}-sg"
-  description = "SmartLogix combined task - port 80 public, EFS via NFS"
-  vpc_id      = aws_vpc.main.id
+  name                   = "${local.name_prefix}-sg"
+  description            = "SmartLogix combined task - port 80 public, EFS via NFS"
+  vpc_id                 = aws_vpc.main.id
+  revoke_rules_on_delete = true
 
   ingress {
     from_port   = 80
@@ -22,9 +23,10 @@ resource "aws_security_group" "smartlogix" {
 }
 
 resource "aws_security_group" "efs" {
-  name        = "${local.name_prefix}-efs-sg"
-  description = "EFS NFS access from SmartLogix task"
-  vpc_id      = aws_vpc.main.id
+  name                   = "${local.name_prefix}-efs-sg"
+  description            = "EFS NFS access from SmartLogix task"
+  vpc_id                 = aws_vpc.main.id
+  revoke_rules_on_delete = true
 
   ingress {
     from_port       = 2049
@@ -42,8 +44,4 @@ resource "aws_security_group" "efs" {
   }
 
   tags = { Name = "${local.name_prefix}-efs-sg" }
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
